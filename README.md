@@ -4,7 +4,7 @@
 
 <p align="center">English | <a href="README.zh-CN.md">简体中文</a></p>
 
-Clip Goat is a tool for cutting clips out of videos and keeping them organised. It exports the time range you select as a new file, and it manages the original videos and the exported clips in a folder tree. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
+Clip Goat is a lightweight, hassle-free tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
 
 ## Use cases
 

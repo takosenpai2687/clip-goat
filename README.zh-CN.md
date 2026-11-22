@@ -4,7 +4,7 @@
 
 <p align="center"><a href="README.md">English</a> | 简体中文</p>
 
-Clip Goat 是一个截取和整理视频片段的工具。它从视频中截取需要的时间段，并在一棵文件夹树里管理原片和截出的片段。它基于 ffmpeg，使用 Electron 和 React 构建，同时提供命令行。
+Clip Goat 是一个轻量省心的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron 和 React 构建，同时提供命令行。
 
 ## 适用场景
 
