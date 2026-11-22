@@ -24,8 +24,8 @@ function flatten(trees, expanded, filter, query) {
     const childStart = rows.length;
     for (const dir of node.dirs) row.count += visit(dir, depth + 1, false, names);
     if (row.open) {
-      for (const { file, child } of grouped(files)) {
-        rows.push({ type: 'file', file, child, depth: depth + (child ? 2 : 1), shown: shortName(file.clipped ? file.label.head : file.name, names) });
+      for (const { file, child, last } of grouped(files)) {
+        rows.push({ type: 'file', file, child, last, depth: depth + (child ? 2 : 1), shown: file.clipped ? file.name : shortName(file.name, names) });
       }
     } else {
       rows.length = childStart;
@@ -59,7 +59,8 @@ function MidName({ text, className }) {
   );
 }
 
-// Puts each clip right under the original it was cut from. Clips whose original is gone come last.
+// Puts each clip right under the original it was cut from. Clips whose original is gone come last,
+// with the first clip of each source standing in as the head of its group.
 function grouped(files) {
   const stem = (f) => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
   const byHead = new Map();
@@ -72,11 +73,14 @@ function grouped(files) {
   const out = [];
   for (const f of files) {
     if (f.clipped) continue;
+    const clips = byHead.get(stem(f)) || [];
     out.push({ file: f, child: false });
-    for (const clip of byHead.get(stem(f)) || []) out.push({ file: clip, child: true });
+    clips.forEach((clip, i) => out.push({ file: clip, child: true, last: i === clips.length - 1 }));
     byHead.delete(stem(f));
   }
-  for (const clips of byHead.values()) clips.forEach((clip) => out.push({ file: clip, child: false }));
+  for (const clips of byHead.values()) {
+    clips.forEach((clip, i) => out.push({ file: clip, child: i > 0, last: i === clips.length - 1 }));
+  }
   return out;
 }
 
@@ -270,6 +274,11 @@ function Library({
               onDragEnd={() => setDropTarget(null)}
               onContextMenu={(event) => openMenu(event, fileItems(file))}
             >
+              {row.child && (
+                <svg className="link" width="14" height="31" viewBox="0 0 14 31" style={{ left: indent.paddingLeft - 14 }} aria-hidden="true">
+                  <path d={row.last ? 'M7 0 V9 Q7 15.5 13 15.5' : 'M7 0 V31 M7 9 Q7 15.5 13 15.5'} />
+                </svg>
+              )}
               <button
                 type="button"
                 role="treeitem"
@@ -281,8 +290,7 @@ function Library({
                 <span className="tree-icon">
                   {file.clipped && <Scissors size={14} strokeWidth={1.5} aria-label={t.clipTag} />}
                 </span>
-                {!row.child && <MidName text={row.shown} className="file-head" />}
-                {file.clipped && <span className="file-tail num">{file.label.tail}</span>}
+                <MidName text={row.shown} className="file-head" />
               </button>
               {file.clips > 0 && (
                 <span className="clip-badge num" title={t.clipCount(file.clips)} aria-label={t.clipCount(file.clips)}>
