@@ -227,6 +227,7 @@ function createWindow() {
     minHeight: 600,
     show: false,
     title: 'Clip Goat',
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     backgroundColor: TITLEBAR.dark.background,
     titleBarStyle: 'hidden',
     titleBarOverlay:

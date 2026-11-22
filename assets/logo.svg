@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">Clip Goat: a goat chewing a strip of film</title>
+  <style>
+    .spin { transform-box: fill-box; transform-origin: center; }
+    .film-roll { animation: roll 2.4s linear infinite; }
+    .jaw { animation: chew 0.56s ease-in-out infinite; }
+    .cheek { animation: munch 0.56s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .ear-l { animation: flick-l 4.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 100% 30%; }
+    .ear-r { animation: flick-r 4.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 30%; }
+    .eye { animation: blink 4.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .strip { animation: sway 2.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 0%; }
+    @keyframes roll { to { transform: translateY(-136px); } }
+    @keyframes chew { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+    @keyframes munch { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04, 0.97); } }
+    @keyframes flick-l { 0%, 62%, 78%, 100% { transform: rotate(0deg); } 68% { transform: rotate(9deg); } 73% { transform: rotate(-4deg); } }
+    @keyframes flick-r { 0%, 20%, 36%, 100% { transform: rotate(0deg); } 26% { transform: rotate(-9deg); } 31% { transform: rotate(4deg); } }
+    @keyframes blink { 0%, 44%, 50%, 100% { transform: scaleY(1); } 47% { transform: scaleY(0.12); } }
+    @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .film-roll, .jaw, .cheek, .ear-l, .ear-r, .eye, .strip { animation: none; }
+    }
+  </style>
+
+  <defs>
+    <clipPath id="film-window">
+      <rect x="-31" y="0" width="62" height="150" rx="7" />
+    </clipPath>
+    <g id="film-cell">
+      <rect x="-31" y="0" width="62" height="34" fill="#0b0d14" />
+      <rect x="-18" y="4" width="36" height="26" rx="4" />
+      <rect x="-28" y="5" width="6" height="7" rx="1.5" fill="#ffffff" />
+      <rect x="-28" y="22" width="6" height="7" rx="1.5" fill="#ffffff" />
+      <rect x="22" y="5" width="6" height="7" rx="1.5" fill="#ffffff" />
+      <rect x="22" y="22" width="6" height="7" rx="1.5" fill="#ffffff" />
+    </g>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="#04152f" />
+
+  <g transform="rotate(-8 256 268)">
+    <!-- horns -->
+    <path d="M198 184 C 190 136 166 106 126 102 C 160 74 228 90 246 166 Z" fill="#e3bd8a" />
+    <path d="M314 184 C 322 136 346 106 386 102 C 352 74 284 90 266 166 Z" fill="#e3bd8a" />
+
+    <!-- ears -->
+    <g class="ear-l">
+      <path d="M158 238 C 118 214 62 222 40 262 C 70 296 128 292 166 264 Z" fill="#fdfcf8" />
+      <path d="M146 246 C 116 232 80 238 60 262 C 86 278 120 274 150 258 Z" fill="#ff9aa2" />
+    </g>
+    <g class="ear-r">
+      <path d="M354 238 C 394 214 450 222 472 262 C 442 296 384 292 346 264 Z" fill="#fdfcf8" />
+      <path d="M366 246 C 396 232 432 238 452 262 C 426 278 392 274 362 258 Z" fill="#ff9aa2" />
+    </g>
+
+    <!-- beard, moves with the jaw -->
+    <g class="jaw">
+      <path d="M222 356 C 216 388 224 404 236 398 C 240 416 250 428 256 430 C 262 416 268 406 274 396 C 286 402 292 386 288 356 Z" fill="#fdfcf8" />
+    </g>
+
+    <!-- head -->
+    <g class="cheek">
+      <path d="M256 142 C 334 142 376 192 376 262 C 376 326 340 376 256 376 C 172 376 136 326 136 262 C 136 192 178 142 256 142 Z" fill="#fdfcf8" />
+    </g>
+    <path d="M234 156 C 238 128 252 112 272 106 C 264 122 268 132 290 126 C 278 140 274 150 280 158 Z" fill="#fdfcf8" />
+
+    <!-- film strip being pulled into the mouth -->
+    <g transform="translate(296 322) rotate(-22)">
+      <g class="strip">
+        <g clip-path="url(#film-window)">
+          <g class="film-roll">
+            <use href="#film-cell" y="0" fill="#ff5f57" />
+            <use href="#film-cell" y="34" fill="#ffd93b" />
+            <use href="#film-cell" y="68" fill="#5fd39a" />
+            <use href="#film-cell" y="102" fill="#4fb0ff" />
+            <use href="#film-cell" y="136" fill="#ff5f57" />
+            <use href="#film-cell" y="170" fill="#ffd93b" />
+            <use href="#film-cell" y="204" fill="#5fd39a" />
+            <use href="#film-cell" y="238" fill="#4fb0ff" />
+            <use href="#film-cell" y="272" fill="#ff5f57" />
+          </g>
+        </g>
+      </g>
+    </g>
+
+    <!-- face -->
+    <circle class="eye" cx="204" cy="252" r="17" fill="#04152f" />
+    <path d="M290 258 Q 312 234 336 254" fill="none" stroke="#04152f" stroke-width="10" stroke-linecap="round" />
+    <path d="M234 288 Q 256 280 278 288 Q 272 306 256 308 Q 240 306 234 288 Z" fill="#04152f" />
+    <g class="jaw" fill="none" stroke="#04152f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M256 306 L 256 320" />
+      <path d="M216 316 Q 236 340 256 320 Q 276 340 298 316" />
+    </g>
+  </g>
+</svg>

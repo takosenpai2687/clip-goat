@@ -248,7 +248,8 @@ button:disabled {
 }
 .mark {
   margin-left: 6px;
-  color: var(--text);
+  border-radius: 6px;
+  -webkit-user-drag: none;
 }
 .brand {
   margin-left: 6px;

@@ -35,6 +35,7 @@
       "shared/**",
       "cli/**",
       "renderer/dist/**",
+      "assets/icon.png",
       "package.json",
       "!node_modules/ffprobe-static/bin/darwin/**",
       "!node_modules/ffprobe-static/bin/linux/**",
@@ -47,7 +48,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,

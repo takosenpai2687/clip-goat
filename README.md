@@ -1,4 +1,6 @@
-# Clip Goat
+<p align="center"><img src="assets/logo.svg" width="160" alt="Clip Goat：一只嚼着胶片的山羊" /></p>
+
+<h1 align="center">Clip Goat</h1>
 
 给视频定一个起点和一个终点，几秒钟导出片段。它是"视频版截图工具"，不是剪辑软件。
 
@@ -28,6 +30,7 @@ clip-goat/
 │  ├─ proxy.js        为无法直接播放的格式生成预览
 │  └─ binaries.js     ffmpeg / ffprobe 路径解析
 ├─ cli/index.js       命令行入口
+├─ assets/            应用图标（icon.ico / icon.png）和 README 用的动画标志（logo.svg）
 ├─ scripts/dev.mjs    开发模式启动脚本
 └─ test/              shared 的单元测试
 ```
@@ -122,7 +125,7 @@ npm run dist     # 生成 release\Clip Goat Setup x.y.z.exe
 $env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
 ```
 
-安装包没有代码签名，在别人的电脑上首次运行会出现 SmartScreen 提示。
+安装包没有代码签名，在别人的电脑上首次运行会出现 SmartScreen 提示。应用图标来自 `assets/icon.ico`。
 
 ## ffmpeg 注意事项
 
