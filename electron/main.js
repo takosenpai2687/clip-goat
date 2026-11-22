@@ -183,13 +183,20 @@ function registerIpc() {
     return { mode: plan.mode, name: path.basename(output), dir };
   });
 
-  handle('export:start', async ({ input, segments, outputDir }) => {
+  handle('export:start', async ({ input, segments, outputDir, name }) => {
+    // A name chosen in the dialog keeps the .mp4 extension and never replaces an existing file.
+    let output;
+    if (name) {
+      if (/[\\/:*?"<>|]/.test(name) || name.endsWith('.')) throw Object.assign(new Error('That name is not allowed.'), { code: 'BAD_NAME' });
+      output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}.mp4`));
+    }
     if (exportJob) throw Object.assign(new Error('An export is already running.'), { code: 'BUSY' });
     exportJob = new AbortController();
     try {
       return await shared.clip({
         input,
         segments,
+        output,
         outputDir: outputDir || undefined,
         mode: 'auto',
         keyframes: cachedKeyframes(input) || undefined,

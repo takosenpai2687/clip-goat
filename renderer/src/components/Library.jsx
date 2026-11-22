@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, ChevronRight, Ellipsis, FolderPlus, Scissors, Search, X } from 'lucide-react';
+import { ChevronRight, Ellipsis, FolderPlus, Scissors, Search, X } from 'lucide-react';
 import Menu from './Menu';
 import { formatDay, formatSize } from '../lib/format';
 import { useT } from '../lib/i18n';
@@ -239,7 +239,7 @@ function Library({
             <div
               key={file.path}
               ref={current ? currentRow : undefined}
-              className={`tree-row is-file${file.clipped ? ' is-clip' : ''}${current ? ' is-current' : ''}`}
+              className={`tree-row is-file${file.clipped ? ' is-clip' : ''}${file.clips > 0 ? ' is-done' : ''}${current ? ' is-current' : ''}`}
               style={indent}
               draggable
               onDragStart={(event) => {
@@ -258,15 +258,17 @@ function Library({
                 onClick={() => onOpen(file.path)}
               >
                 <span className="tree-icon">
-                  {file.clipped ? (
-                    <Scissors size={14} strokeWidth={1.5} aria-label={t.clipTag} />
-                  ) : file.done ? (
-                    <Check size={14} strokeWidth={1.5} aria-label={t.doneTag} />
-                  ) : null}
+                  {file.clipped && <Scissors size={14} strokeWidth={1.5} aria-label={t.clipTag} />}
                 </span>
                 <MidName text={row.shown} className="file-head" />
                 {file.clipped && <span className="file-tail num">{file.label.tail}</span>}
               </button>
+              {file.clips > 0 && (
+                <span className="clip-badge num" title={t.clipCount(file.clips)} aria-label={t.clipCount(file.clips)}>
+                  <Scissors size={12} strokeWidth={2} aria-hidden="true" />
+                  {file.clips}
+                </span>
+              )}
               <button type="button" className="row-more" aria-label={t.more} title={t.more} onClick={(event) => openMenu(event, fileItems(file))}>
                 <Ellipsis size={16} strokeWidth={1.5} />
               </button>

@@ -5,6 +5,7 @@ import { Maximize2, Pause, Play, Plus, Trash2, ZoomIn, ZoomOut } from 'lucide-re
 import TitleBar from './components/TitleBar';
 import Library from './components/Library';
 import Backdrop from './components/Backdrop';
+import NameDialog from './components/NameDialog';
 import StageControls, { RATE_CHOICES, SKIP_CHOICES } from './components/StageControls';
 import Timeline from './components/Timeline';
 import ExportBar from './components/ExportBar';
@@ -76,6 +77,7 @@ export default function App() {
     const saved = Number(stored('rate', 1));
     return RATE_CHOICES.includes(saved) ? saved : 1;
   });
+  const [naming, setNaming] = useState(null);
   const [stageHot, setStageHot] = useState(false);
   const stageTimer = useRef(0);
 
@@ -87,7 +89,7 @@ export default function App() {
   const loadToken = useRef(0);
   const live = useRef({});
   const noticeTimer = useRef(0);
-  live.current = { doc, skip, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
+  live.current = { doc, naming, skip, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
 
   const duration = doc ? doc.info.duration : 0;
   const fps = doc ? doc.info.video.fps || 30 : 30;
@@ -277,6 +279,11 @@ export default function App() {
     [fileOp],
   );
   const showPath = useCallback((target) => api.showInFolder(target), []);
+  // Offered right after an export: the clip is saved, so the original can go to the Recycle Bin.
+  const deleteSource = useCallback(() => {
+    const { doc: current, exp: state } = live.current;
+    if (current && state.status === 'done') trashFile(current.path);
+  }, [trashFile]);
 
   /* ---------- playback ---------- */
 
@@ -455,7 +462,7 @@ export default function App() {
 
   /* ---------- export ---------- */
 
-  const runExport = useCallback(async () => {
+  const runExport = useCallback(async (name) => {
     const { doc: current, segments: segs, exp: state, plan: currentPlan, t: text } = live.current;
     if (!current || state.status === 'running') return;
     if (videoRef.current) videoRef.current.pause();
@@ -465,6 +472,7 @@ export default function App() {
         input: current.path,
         segments: segs.map(({ start, end }) => ({ start, end })),
         outputDir: live.current.dest,
+        name,
       });
       setExp({ status: 'done', percent: 100, result });
       rescan();
@@ -473,6 +481,24 @@ export default function App() {
       else setExp({ status: 'error', percent: 0, message: errorText(text, err, 'errExport') });
     }
   }, [rescan]);
+
+  // Export starts with a dialog that confirms the file name; the extension is fixed.
+  const requestExport = useCallback(() => {
+    const { doc: current, exp: state, plan: currentPlan } = live.current;
+    if (!current || state.status === 'running' || state.status === 'done' || !currentPlan.name) return;
+    if (videoRef.current) videoRef.current.pause();
+    setNaming({ stem: currentPlan.name.replace(/\.mp4$/i, ''), dir: currentPlan.dir || '' });
+  }, []);
+  const confirmName = useCallback(
+    (name) => {
+      // An unchanged name is left to the exporter, which names the clip after the range it actually writes.
+      const unchanged = live.current.naming && name === live.current.naming.stem;
+      setNaming(null);
+      runExport(unchanged ? undefined : name);
+    },
+    [runExport],
+  );
+  const cancelName = useCallback(() => setNaming(null), []);
 
   const showResult = useCallback(() => {
     const { exp: state } = live.current;
@@ -579,7 +605,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (event) => {
       const tag = event.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || live.current.naming) return;
       const { exp: state, doc: current, time: now } = live.current;
       if (state.status === 'running') {
         if (event.key === 'Escape') cancelExport();
@@ -642,7 +668,9 @@ export default function App() {
           removeRange();
           break;
         case 'Enter':
-          runExport();
+          // preventDefault keeps this same key press from also confirming the dialog it opens.
+          event.preventDefault();
+          if (!event.repeat) requestExport();
           break;
         case 'Escape':
           dismissResult();
@@ -660,7 +688,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mouseup', dropFocus);
     };
-  }, [togglePlay, skipBy, toggleMute, wakeStage, seek, markEdge, addRange, removeRange, runExport, dismissResult, cancelExport, pickFile]);
+  }, [togglePlay, skipBy, toggleMute, wakeStage, seek, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
     const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
@@ -912,10 +940,11 @@ export default function App() {
                       onDest={setDest}
                       onChooseDest={chooseDest}
                       state={exp}
-                      onExport={runExport}
+                      onExport={requestExport}
                       onCancel={cancelExport}
                       onShow={showResult}
                       onDismiss={dismissResult}
+                      onDeleteSource={deleteSource}
                     />
                   </motion.section>
                 )}
@@ -923,6 +952,9 @@ export default function App() {
             </main>
           </div>
         </div>
+        <AnimatePresence>
+          {naming && <NameDialog key="name" stem={naming.stem} ext=".mp4" dir={naming.dir} onConfirm={confirmName} onCancel={cancelName} />}
+        </AnimatePresence>
       </MotionConfig>
     </I18nContext.Provider>
   );

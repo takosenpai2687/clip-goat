@@ -326,6 +326,25 @@ button:disabled {
 .button-icon.is-hint {
   opacity: 0.6;
 }
+.danger-button {
+  height: 36px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--negative);
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: opacity 140ms var(--ease);
+}
+.danger-button:hover {
+  opacity: 0.88;
+}
+:root[data-theme='dark'] .danger-button {
+  color: #1a0508;
+}
 .ghost-button {
   background: var(--raised);
   color: var(--text);
@@ -599,6 +618,22 @@ button:disabled {
   font: inherit;
   user-select: text;
 }
+.clip-badge {
+  flex: none;
+  height: 18px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.tree-row.is-done .file-head {
+  color: var(--muted);
+}
 .empty-note {
   padding: 8px 10px;
   color: var(--faint);
@@ -658,6 +693,84 @@ button:disabled {
   margin-top: -3px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+.dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+}
+.dialog {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: var(--radius-card);
+  background: var(--menu);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px var(--glass-edge);
+}
+.dialog h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.name-field {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-inner);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--muted);
+  transition: box-shadow 140ms var(--ease);
+}
+.name-field:focus-within {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.name-field.is-invalid {
+  box-shadow: inset 0 0 0 2px var(--negative);
+}
+.name-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+.name-ext {
+  flex: none;
+  color: var(--faint);
+}
+.dialog-note {
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialog-note.is-error {
+  color: var(--negative);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.primary-button:disabled {
+  opacity: 0.4;
 }
 
 /* ---------- workspace ---------- */
@@ -1117,6 +1230,20 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.out-name.is-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.out-name.is-done > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.out-name.is-done svg {
+  flex: none;
+  color: var(--accent);
 }
 .status-sub {
   font-size: 12px;

@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, CornerDownLeft, Crosshair, FolderInput, X, Zap } from 'lucide-react';
+import { Check, CornerDownLeft, Crosshair, FolderInput, Trash2, X, Zap } from 'lucide-react';
 import Menu from './Menu';
 import { formatLength, formatTime } from '../lib/format';
 import { useT } from '../lib/i18n';
@@ -14,7 +14,7 @@ const swap = {
 
 const baseName = (dir) => (dir || '').split(/[\\/]/).filter(Boolean).pop() || '';
 
-function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss }) {
+function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss, onDeleteSource }) {
   const t = useT();
   const [menu, setMenu] = useState(null);
   const figure = formatLength(length);
@@ -56,10 +56,11 @@ function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onCh
             </motion.p>
           ) : state.status === 'done' ? (
             <motion.p key="done" className="status-line" {...swap}>
-              <span className="out-name" title={state.result.output}>
-                {state.result.output.split(/[\\/]/).pop()}
+              <span className="out-name is-done" title={state.result.output}>
+                <Check size={14} strokeWidth={2} aria-hidden="true" />
+                <span>{state.result.output.split(/[\\/]/).pop()}</span>
               </span>
-              {state.result.fellBack && <span className="status-sub">{t.fellBack}</span>}
+              <span className="status-sub">{state.result.fellBack ? t.fellBack : t.askDelete}</span>
             </motion.p>
           ) : (
             <motion.p key="idle" className="status-line" {...swap}>
@@ -121,17 +122,22 @@ function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onCh
               <button type="button" className="ghost-button" onClick={onShow}>
                 {t.showInFolder}
               </button>
-              <button type="button" className="primary-button is-done" onClick={onDismiss}>
-                <motion.span
-                  className="button-icon"
-                  initial={{ scale: 0.4, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 600, damping: 22 }}
-                >
-                  <Check size={16} strokeWidth={2} />
-                </motion.span>
-                {t.exported}
+              <button type="button" className="ghost-button" onClick={onDismiss} title="Esc">
+                {t.keepSource}
               </button>
+              <motion.button
+                type="button"
+                className="danger-button"
+                onClick={onDeleteSource}
+                title={t.deleteSourceTip}
+                whileTap={{ scale: 0.97 }}
+                initial={{ scale: 0.92 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+              >
+                <Trash2 size={16} strokeWidth={1.75} />
+                {t.deleteSource}
+              </motion.button>
             </motion.div>
           ) : (
             <motion.button

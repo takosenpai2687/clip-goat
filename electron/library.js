@@ -60,7 +60,7 @@ function eachFile(node, fn) {
   node.dirs.forEach((d) => eachFile(d, fn));
 }
 
-// One tree per root. Originals that already have a clip anywhere in the library get done: true.
+// One tree per root. Each original gets clips: how many clips anywhere in the library were cut from it.
 async function scanLibrary(roots) {
   const budget = { left: MAX_ENTRIES };
   const trees = [];
@@ -68,15 +68,17 @@ async function scanLibrary(roots) {
     const node = await scanDir(root, 0, budget);
     trees.push(node || { path: root, name: path.basename(root) || root, dirs: [], files: [], total: 0, missing: true });
   }
-  const clippedFrom = new Set();
+  const clippedFrom = new Map();
   for (const tree of trees) {
     eachFile(tree, (f) => {
-      if (f.clipped) clippedFrom.add(f.label.head.toLowerCase());
+      if (!f.clipped) return;
+      const key = f.label.head.toLowerCase();
+      clippedFrom.set(key, (clippedFrom.get(key) || 0) + 1);
     });
   }
   for (const tree of trees) {
     eachFile(tree, (f) => {
-      if (!f.clipped) f.done = clippedFrom.has(path.basename(f.name, path.extname(f.name)).toLowerCase());
+      if (!f.clipped) f.clips = clippedFrom.get(path.basename(f.name, path.extname(f.name)).toLowerCase()) || 0;
     });
   }
   return trees;
