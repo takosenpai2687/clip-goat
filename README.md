@@ -31,9 +31,9 @@ Clip Goat 针对这个过程设计：
 - **ffmpeg 命令行**速度快、不损画质，但需要自己找时间点、手写参数，操作时看不到画面。
 - **两者都不管截完之后的文件。** 原片和片段混在同一批文件夹里，很难分辨哪些录像已经处理过。
 
-Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后快速导出这两点之间的片段。
+> **Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后快速导出这两点之间的片段。**
 
-其余的步骤都被省掉了：
+*其余的步骤都被省掉了：*
 
 - 没有工程、轨道和导出参数。打开视频，拖动两个手柄，按回车。
 - 能复制音视频流时就不重新编码，短片段的导出约 1 秒完成，画质没有损失。
@@ -44,35 +44,31 @@ Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后�
 
 ## 功能
 
-- **资源库**：以文件夹树浏览全部视频，区分原片与截出的片段，标记已经截取过的原片，支持搜索、移动、重命名和删除。
-- **截取片段**：在时间轨上拖动起点和终点手柄，导出两者之间的部分。
-- **流复制优先**：起点位于关键帧时直接复制音视频流，不重新编码，画质与原片一致。一段 8 秒的 4K60 录像导出耗时约 1 秒。
-- **精确截取**：起点不在关键帧时，自动重新编码该片段，精确到帧，码率不超过原片。
-- **多段拼接**：一个视频可以选取多个片段，导出时按时间顺序合并为一个文件。
-- **片段可以再剪**：导出的片段可以再次打开截取。每个片段在文件自身的元数据里记录了原视频的名称和所取的时间范围，因此再剪出的片段仍以原视频命名，并和同源的片段排在一起，原视频删除后也一样。
-- **保留全部音轨**：导出文件包含原视频的所有音轨。
-- **格式支持**：MP4、MKV、MOV、WebM 可直接预览；AVI、FLV 等格式会先生成预览文件，导出时仍读取原文件。
-- **内置 ffmpeg**：不需要另外安装。
-- **命令行**：提供 `clip-goat` 命令，与桌面应用使用同一套裁切逻辑。
-- **界面**：深色和浅色主题，中文和英文。
+- ✂️ **截取片段**：拖动起点和终点手柄，按回车导出
+- ⚡ **秒出**：起点在关键帧上时不重新编码，画质与原片一致
+- 🎯 **精确到帧**：起点不在关键帧上时自动重新编码
+- 🧩 **多段拼接**：多个片段合并为一个文件
+- 🔁 **片段可以再剪**：来源记录在文件元数据里，原视频删除后仍可继续剪
+- 🗂️ **资源库**：文件夹树，片段排在所属原片下方，支持搜索、移动、重命名和删除
+- 🗑️ **释放空间**：导出后可一键把原视频移到回收站
+- 🔊 **保留全部音轨**
+- 🎞️ **常见格式**：MP4、MKV、MOV、WebM、AVI、FLV 等
+- 📦 **内置 ffmpeg**：不需要另外安装
+- ⌨️ **命令行**：`clip-goat` 命令，与桌面应用共用裁切逻辑
+- 🌗 **界面**：深色和浅色主题，中文和英文
 
 ## 使用
 
-1. 打开视频：将文件拖入窗口，或在左侧资源库中点击。
-2. 选取片段：拖动时间轨两端的手柄，预览画面会跳转到手柄所在的位置。
-3. 导出：按回车。弹出的对话框里是默认文件名，可以修改，再按回车确认。扩展名固定为 `.mp4`，不能更改。
-4. 可选，删除原片：片段保存后，导出栏会询问是否删除原视频。"删除原视频"把它移到回收站，"保留原视频"则不做改动。
+1. **打开**：把视频拖进窗口，或在左侧资源库里点击。
+2. **选取**：拖动时间轨两端的手柄。
+3. **导出**：按回车，确认文件名后再按一次回车。
+4. **清理**（可选）：导出后点"删除原视频"，把原片移到回收站。
 
-导出的文件默认保存在原视频所在的文件夹，命名格式为 `{原文件名}_clip_{起点}s-{终点}s.mp4`，例如 `Game_clip_112.5s-115.8s.mp4`。存在同名文件时会追加序号，不会覆盖。
+片段默认保存在原视频旁边，命名为 `{原文件名}_clip_{起点}s-{终点}s.mp4`，重名时自动加序号。
 
-导出按钮左侧有两个标记：
-
-- **导出位置**：显示目标文件夹，点击可以更改。
-- **导出方式**：显示"秒出"（流复制）或"精确"（重新编码）。处于"精确"时点击该标记，会把起点移到前一个关键帧，改为流复制。
-
-鼠标移到预览画面上时，画面中央显示播放、后退和前进按钮。后退和前进的跨度默认为 10 秒，右键这两个按钮可以改为 5、15、30 或 60 秒。在选区内跳转时，最多跳到选区的边缘；在边缘再按一次才会跳出选区。画面左下角同时显示音量和播放速度（0.25× 到 2×），这两项只作用于预览，不影响导出的文件。
-
-拖动起点手柄时，手柄会吸附到附近的关键帧。按住 `Alt` 可以关闭吸附。
+- 导出按钮左侧的两个标记分别显示导出位置和导出方式（"秒出"或"精确"）。点击前者可更改文件夹；点击"精确"可把起点对齐到关键帧，改为秒出。
+- 鼠标移到预览画面上时，会出现播放、后退、前进、音量和倍速控制。右键后退或前进按钮可更改跨度；音量和倍速只影响预览。
+- 起点手柄会吸附到附近的关键帧，按住 `Alt` 可关闭吸附。
 
 ### 快捷键
 
@@ -207,9 +203,9 @@ Cutting a dozen seconds out of a recording is a small job, but the usual ways of
 - **The ffmpeg command line** is fast and lossless, but you have to find the timestamps yourself, write the arguments by hand, and you cannot see the picture while doing it.
 - **Neither helps with the files afterwards.** Originals and clips end up mixed in the same folders, and it is hard to tell which recordings have already been dealt with.
 
-Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.
+> **Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.**
 
-Everything else is kept out of the way:
+*Everything else is kept out of the way:*
 
 - There are no projects, tracks or export settings. You open a video, drag two handles and press Enter.
 - It copies the streams instead of re-encoding whenever it can, so a short clip exports in about a second and loses no quality.
@@ -220,35 +216,31 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 
 ## Features
 
-- **Library**: browses all videos as a folder tree, tells originals from exported clips, marks originals that already have a clip, and supports search, move, rename and delete.
-- **Clipping**: drag the start and end handles on the timeline and export the part between them.
-- **Stream copy first**: when the start sits on a keyframe, the audio and video streams are copied without re-encoding, so the quality is identical to the original. Exporting 8 seconds of a 4K60 recording takes about 1 second.
-- **Frame-exact cuts**: when the start is not on a keyframe, the range is re-encoded automatically, exact to the frame, at a bitrate no higher than the original.
-- **Joining ranges**: several ranges can be selected in one video and are merged in time order into a single file.
-- **Clips of clips**: an exported clip can be opened and cut again. Each clip records the name of its original video and the time range it came from in the file's own metadata, so a new clip is still named after the original and listed with its sibling clips, even after the original has been deleted.
-- **All audio tracks kept**: the exported file contains every audio track of the source.
-- **Formats**: MP4, MKV, MOV and WebM preview directly. For formats such as AVI and FLV, a preview file is generated first; the export still reads the original file.
-- **Bundled ffmpeg**: no separate installation is needed.
-- **Command line**: the `clip-goat` command uses the same cutting logic as the desktop app.
-- **Interface**: dark and light themes, English and Chinese.
+- ✂️ **Clipping**: drag the start and end handles, press Enter to export
+- ⚡ **Instant export**: no re-encoding when the start sits on a keyframe; quality is identical to the original
+- 🎯 **Frame-exact cuts**: re-encodes automatically when the start is not on a keyframe
+- 🧩 **Joining ranges**: several ranges merged into one file
+- 🔁 **Clips of clips**: the source is recorded in the file metadata, so clips can be cut again even after the original is deleted
+- 🗂️ **Library**: a folder tree with clips listed under the video they came from; search, move, rename and delete
+- 🗑️ **Free up space**: move the original to the Recycle Bin in one click after an export
+- 🔊 **All audio tracks kept**
+- 🎞️ **Common formats**: MP4, MKV, MOV, WebM, AVI, FLV and more
+- 📦 **Bundled ffmpeg**: no separate installation
+- ⌨️ **Command line**: the `clip-goat` command shares the cutting logic of the desktop app
+- 🌗 **Interface**: dark and light themes, English and Chinese
 
 ## Usage
 
-1. Open a video: drop a file onto the window, or click one in the library on the left.
-2. Select a range: drag the handles at either end of the timeline. The preview jumps to the position of the handle.
-3. Export: press Enter. A dialog shows the file name, filled in with the default; edit it if you like and press Enter again. The `.mp4` extension is fixed.
-4. Optionally delete the original: once the clip is saved, the export bar asks whether to delete the original video. "Delete original" moves it to the Recycle Bin; "Keep original" leaves it in place.
+1. **Open**: drop a video onto the window, or click one in the library on the left.
+2. **Select**: drag the handles at either end of the timeline.
+3. **Export**: press Enter, confirm the file name, and press Enter again.
+4. **Clean up** (optional): after the export, click "Delete original" to move the original to the Recycle Bin.
 
-By default the exported file is saved in the same folder as the source video and named `{original-name}_clip_{start}s-{end}s.mp4`, for example `Game_clip_112.5s-115.8s.mp4`. If a file with that name exists, a number is appended; nothing is overwritten.
+Clips are saved next to the source video as `{original-name}_clip_{start}s-{end}s.mp4`; a number is appended if the name is taken.
 
-Two chips sit to the left of the Export button:
-
-- **Destination**: shows the target folder. Click it to change the folder.
-- **Export mode**: shows "Instant" (stream copy) or "Exact" (re-encode). Clicking it while it shows "Exact" moves the start back to the previous keyframe and switches to stream copy.
-
-When the pointer is over the preview, play, back and forward buttons appear in the middle of the picture. Back and forward jump 10 seconds by default; right-click either button to change this to 5, 15, 30 or 60 seconds. Inside a selected range a jump stops at the edge of the range; pressing again from the edge leaves the range. Volume and playback speed (0.25× to 2×) appear in the bottom-left corner of the picture; both apply to the preview only and do not affect exported files.
-
-While you drag the start handle, it snaps to nearby keyframes. Hold `Alt` to turn snapping off.
+- The two chips to the left of the Export button show the destination and the export mode ("Instant" or "Exact"). Click the first to change the folder; click "Exact" to move the start onto a keyframe and export instantly.
+- When the pointer is over the preview, controls for play, back, forward, volume and speed appear. Right-click back or forward to change the skip amount; volume and speed affect the preview only.
+- The start handle snaps to nearby keyframes; hold `Alt` to turn snapping off.
 
 ### Keyboard shortcuts
 
