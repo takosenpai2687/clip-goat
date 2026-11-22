@@ -14,12 +14,14 @@ Cutting a dozen seconds out of a recording is a small job, but the usual ways of
 - **The ffmpeg command line** is fast and lossless, but you have to find the timestamps yourself, write the arguments by hand, and you cannot see the picture while doing it.
 - **Neither helps with the files afterwards.** Originals and clips end up mixed in the same folders, and it is hard to tell which recordings have already been dealt with.
 
-Clip Goat does only this one job:
+Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.
 
-- There are no projects, tracks or export dialogs. You open a video, drag two handles and press Enter.
+Everything else is kept out of the way:
+
+- There are no projects, tracks or export settings. You open a video, drag two handles and press Enter.
 - It copies the streams instead of re-encoding whenever it can, so a short clip exports in about a second and loses no quality.
 - The clip is named automatically and saved next to the original.
-- The library shows originals and clips in one folder tree and marks the originals that already have a clip.
+- Originals and clips appear in one folder tree, and originals that already have clips are marked.
 
 It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.
 
@@ -36,7 +38,7 @@ Game replays are a typical example. Features such as NVIDIA Instant Replay save 
 Clip Goat is designed around this workflow:
 
 - On launch, it lists every video in your Videos folder and its subfolders.
-- It cuts a few seconds out of a video. When the start sits on a keyframe, nothing is re-encoded and the quality is identical to the original.
+- It cuts a dozen seconds or so out of a video. When the start sits on a keyframe, nothing is re-encoded and the quality is identical to the original.
 - After each export it offers to move the original to the Recycle Bin, and originals that already have clips are marked in the library, so disk space is easy to reclaim.
 - Clips can be exported to a folder you choose, or dragged between folders in the tree.
 
@@ -134,7 +136,14 @@ The installer is written to the `release` folder as `Clip Goat Setup x.y.z.exe`.
 
 To use only the command line, run `npm link` after `npm install`. The `clip-goat` command is then available in any directory.
 
-On networks in mainland China, the dependencies need mirrors; see the [Chinese installation notes](#zh-install).
+On networks in mainland China, set these mirrors before installing the dependencies:
+
+```powershell
+$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+$env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
+$env:FFMPEG_BINARIES_URL="https://cdn.npmmirror.com/binaries/ffmpeg-static"
+npm install --registry=https://registry.npmmirror.com
+```
 
 ## Known limitations
 
@@ -181,12 +190,14 @@ Clip Goat 是一个轻量省心的视频高光摘取与素材整理工具，基�
 - **ffmpeg 命令行**速度快、不损画质，但需要自己找时间点、手写参数，操作时看不到画面。
 - **两者都不管截完之后的文件。** 原片和片段混在同一批文件夹里，很难分辨哪些录像已经处理过。
 
-Clip Goat 只做这一件事：
+Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后快速导出这两点之间的片段。
 
-- 没有工程、轨道和导出对话框。打开视频，拖动两个手柄，按回车。
+其余的步骤都被省掉了：
+
+- 没有工程、轨道和导出参数。打开视频，拖动两个手柄，按回车。
 - 能复制音视频流时就不重新编码，短片段的导出约 1 秒完成，画质没有损失。
 - 片段自动命名，保存在原片旁边。
-- 资源库在一棵文件夹树里显示原片和片段，并标记已经截取过的原片。
+- 原片和片段显示在同一棵文件夹树里，已经剪出过片段的原片带有标记。
 
 它不能替代剪辑软件：没有转场、字幕、调色和多轨时间线。
 
@@ -196,10 +207,14 @@ Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游�
 
 以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
 
+<p align="center">
+  <img src="docs/screenshot-20261122-222127.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
+</p>
+
 Clip Goat 针对这个过程设计：
 
 - 启动后直接显示"视频"文件夹及其子文件夹中的全部视频。
-- 截取一段视频中的几秒。起点位于关键帧时不重新编码，画质与原片一致。
+- 截取一段视频中的十几秒。起点位于关键帧时不重新编码，画质与原片一致。
 - 每次导出后会询问是否把原片移到回收站；资源库里也会标出已经剪出过片段的原片，便于释放磁盘空间。
 - 截出的片段可以导出到指定文件夹，或在文件夹树中拖动归类。
 
@@ -281,8 +296,6 @@ clip-goat -i Game.mp4 -s 112.5 -e 115.8
 clip-goat -i Game.mp4 --segments 10-15,42.5-48
 clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
 ```
-
-<a id="zh-install"></a>
 
 ## 安装
 
