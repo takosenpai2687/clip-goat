@@ -2,185 +2,26 @@
 
 <h1 align="center">Clip Goat</h1>
 
-<p align="center"><a id="en"></a>English | <a href="#zh">简体中文</a></p>
-
-Clip Goat is a lightweight, hassle-free tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
-
-## Why Clip Goat
-
-Cutting a dozen seconds out of a recording is a small job, but the usual ways of doing it are heavier than the job itself:
-
-- **Professional editors** such as Premiere Pro or DaVinci Resolve are built for full productions. To cut one clip you create a project, import the footage, place it on a timeline and choose export settings, and the export normally re-encodes the video.
-- **The ffmpeg command line** is fast and lossless, but you have to find the timestamps yourself, write the arguments by hand, and you cannot see the picture while doing it.
-- **Neither helps with the files afterwards.** Originals and clips end up mixed in the same folders, and it is hard to tell which recordings have already been dealt with.
-
-Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.
-
-Everything else is kept out of the way:
-
-- There are no projects, tracks or export settings. You open a video, drag two handles and press Enter.
-- It copies the streams instead of re-encoding whenever it can, so a short clip exports in about a second and loses no quality.
-- The clip is named automatically and saved next to the original.
-- Originals and clips appear in one folder tree, and originals that already have clips are marked.
-
-It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.
-
-## Use cases
-
-Clip Goat suits any situation where the video is long and the part you need is short: game replays, screen recordings, stream archives, security footage, and footage shot on a phone.
-
-Game replays are a typical example. Features such as NVIDIA Instant Replay save the last fixed stretch of gameplay each time. A 2-minute 4K60 recording is about 700 MB, and the part worth keeping is usually only a dozen seconds or so. As recordings pile up, they become hard to find and take up a lot of disk space.
-
-<p align="center">
-  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
-</p>
-
-Clip Goat is designed around this workflow:
-
-- On launch, it lists every video in your Videos folder and its subfolders.
-- It cuts a dozen seconds or so out of a video. When the start sits on a keyframe, nothing is re-encoded and the quality is identical to the original.
-- After each export it offers to move the original to the Recycle Bin, and originals that already have clips are marked in the library, so disk space is easy to reclaim.
-- Clips can be exported to a folder you choose, or dragged between folders in the tree.
-
-## Features
-
-- **Library**: browses all videos as a folder tree, tells originals from exported clips, marks originals that already have a clip, and supports search, move, rename and delete.
-- **Clipping**: drag the start and end handles on the timeline and export the part between them.
-- **Stream copy first**: when the start sits on a keyframe, the audio and video streams are copied without re-encoding, so the quality is identical to the original. Exporting 8 seconds of a 4K60 recording takes about 1 second.
-- **Frame-exact cuts**: when the start is not on a keyframe, the range is re-encoded automatically, exact to the frame, at a bitrate no higher than the original.
-- **Joining ranges**: several ranges can be selected in one video and are merged in time order into a single file.
-- **Clips of clips**: an exported clip can be opened and cut again. Each clip records the name of its original video and the time range it came from in the file's own metadata, so a new clip is still named after the original and listed with its sibling clips, even after the original has been deleted.
-- **All audio tracks kept**: the exported file contains every audio track of the source.
-- **Formats**: MP4, MKV, MOV and WebM preview directly. For formats such as AVI and FLV, a preview file is generated first; the export still reads the original file.
-- **Bundled ffmpeg**: no separate installation is needed.
-- **Command line**: the `clip-goat` command uses the same cutting logic as the desktop app.
-- **Interface**: dark and light themes, English and Chinese.
-
-## Usage
-
-1. Open a video: drop a file onto the window, or click one in the library on the left.
-2. Select a range: drag the handles at either end of the timeline. The preview jumps to the position of the handle.
-3. Export: press Enter. A dialog shows the file name, filled in with the default; edit it if you like and press Enter again. The `.mp4` extension is fixed.
-4. Optionally delete the original: once the clip is saved, the export bar asks whether to delete the original video. "Delete original" moves it to the Recycle Bin; "Keep original" leaves it in place.
-
-By default the exported file is saved in the same folder as the source video and named `{original-name}_clip_{start}s-{end}s.mp4`, for example `Game_clip_112.5s-115.8s.mp4`. If a file with that name exists, a number is appended; nothing is overwritten.
-
-Two chips sit to the left of the Export button:
-
-- **Destination**: shows the target folder. Click it to change the folder.
-- **Export mode**: shows "Instant" (stream copy) or "Exact" (re-encode). Clicking it while it shows "Exact" moves the start back to the previous keyframe and switches to stream copy.
-
-When the pointer is over the preview, play, back and forward buttons appear in the middle of the picture. Back and forward jump 10 seconds by default; right-click either button to change this to 5, 15, 30 or 60 seconds. Inside a selected range a jump stops at the edge of the range; pressing again from the edge leaves the range. Volume and playback speed (0.25× to 2×) appear in the bottom-left corner of the picture; both apply to the preview only and do not affect exported files.
-
-While you drag the start handle, it snaps to nearby keyframes. Hold `Alt` to turn snapping off.
-
-### Keyboard shortcuts
-
-| Key | Action |
-|---|---|
-| `Space` | Play or pause. When playback starts inside the selection, only the selection plays |
-| `I` / `O` | Set the start / end to the current position |
-| `M` | Mute or unmute |
-| `↑` / `↓` | Raise / lower the volume |
-| `J` / `L` | Jump back / ahead by the skip amount (10 seconds by default) without stopping playback |
-| `←` / `→` | Move one frame; hold `Shift` to move 1 second |
-| `S` | Split the range at the current position; outside a range, add a new one |
-| `Delete` | Remove the selected range |
-| `Enter` | Export |
-| `Esc` | Cancel the export |
-| `Ctrl+O` | Open a video |
-| Mouse wheel | Zoom the timeline; hold `Shift` to pan |
-
-## Command line
-
-```powershell
-clip-goat -i Game.mp4 -s 112.5 -e 115.8
-```
-
-On success the command prints the path of the exported file to standard output and exits with code 0. On failure it prints the reason to standard error and exits with a non-zero code.
-
-| Option | Description |
-|---|---|
-| `-i, --input` | Input video |
-| `-s, --start` | Start in seconds; decimals allowed |
-| `-e, --end` | End in seconds; decimals allowed |
-| `--segments` | Several ranges joined in order, written as `start-end,start-end` |
-| `-o, --output` | Output path; `.mp4`, `.mov` and `.mkv` are supported |
-| `--out-dir` | Output folder; the file name is generated automatically |
-| `--fast` | Stream copy from the nearest keyframe before the start |
-| `--force-encode` | Always re-encode |
-| `--overwrite` | Overwrite an existing output file |
-| `--json` | Print the result as JSON |
-
-Without `--fast` or `--force-encode`, the behaviour matches the desktop app: stream copy when the start sits on a keyframe, re-encode otherwise. If stream copy fails, it falls back to re-encoding.
-
-Examples:
-
-```powershell
-clip-goat -i Game.mp4 --segments 10-15,42.5-48
-clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
-```
-
-## Installation
-
-No installer has been released yet, so the app has to be built from source. Building requires Node.js 20 or later.
-
-```powershell
-git clone <repository-url>
-cd clip-goat
-npm install
-npm run dist
-```
-
-The installer is written to the `release` folder as `Clip Goat Setup x.y.z.exe`. It is not code-signed, so Windows shows a SmartScreen prompt the first time it runs.
-
-To use only the command line, run `npm link` after `npm install`. The `clip-goat` command is then available in any directory.
-
-On networks in mainland China, set these mirrors before installing the dependencies:
-
-```powershell
-$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-$env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
-$env:FFMPEG_BINARIES_URL="https://cdn.npmmirror.com/binaries/ffmpeg-static"
-npm install --registry=https://registry.npmmirror.com
-```
-
-## Known limitations
-
-- Stream copy can only start on a keyframe, so the start precision of an "Instant" export depends on the keyframe interval of the video.
-- Re-encoding produces 8-bit H.264. HDR videos look washed out after re-encoding and should be exported with stream copy.
-- The preview and the exported result may differ by one frame, more noticeably with variable-frame-rate videos.
-- When ranges are joined, each seam gains about 20 to 100 ms of extra picture. Audio and video stay in sync.
-
-## Development
-
-```powershell
-npm run dev      # development mode with hot reload; F12 opens the developer tools
-npm start        # build the interface, then launch
-npm test         # run the unit tests
-```
-
-| Directory | Contents |
-|---|---|
-| `shared/` | Cutting, video probing and file naming, shared by the desktop app and the command line |
-| `cli/` | Command-line entry point |
-| `electron/` | Main process: window, local video access, library, export jobs |
-| `renderer/` | Interface, React + Vite |
-| `assets/` | Icons and logo |
-
-The environment variables `CLIP_GOAT_FFMPEG` and `CLIP_GOAT_FFPROBE` select a different ffmpeg and ffprobe.
-
-## License
-
-Released under GPL-3.0-or-later. The bundled ffmpeg is a GPL build.
-
----
-
-<h1 align="center"><a id="zh"></a>Clip Goat 中文说明</h1>
-
-<p align="center"><a href="#en">English</a> | 简体中文</p>
+<p align="center"><a id="zh"></a>简体中文 | <a href="#en">English</a></p>
 
 Clip Goat 是一个轻量省心的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron 和 React 构建，同时提供命令行。
+
+## 适用场景
+
+Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游戏回放、屏幕录制、直播存档、监控录像和手机拍摄的素材。
+
+以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
+
+<p align="center">
+  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
+</p>
+
+Clip Goat 针对这个过程设计：
+
+- 启动后直接显示"视频"文件夹及其子文件夹中的全部视频。
+- 截取一段视频中的十几秒。起点位于关键帧时不重新编码，画质与原片一致。
+- 每次导出后会询问是否把原片移到回收站；资源库里也会标出已经剪出过片段的原片，便于释放磁盘空间。
+- 截出的片段可以导出到指定文件夹，或在文件夹树中拖动归类。
 
 ## 为什么做 Clip Goat
 
@@ -200,23 +41,6 @@ Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后�
 - 原片和片段显示在同一棵文件夹树里，已经剪出过片段的原片带有标记。
 
 它不能替代剪辑软件：没有转场、字幕、调色和多轨时间线。
-
-## 适用场景
-
-Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游戏回放、屏幕录制、直播存档、监控录像和手机拍摄的素材。
-
-以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
-
-<p align="center">
-  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
-</p>
-
-Clip Goat 针对这个过程设计：
-
-- 启动后直接显示"视频"文件夹及其子文件夹中的全部视频。
-- 截取一段视频中的十几秒。起点位于关键帧时不重新编码，画质与原片一致。
-- 每次导出后会询问是否把原片移到回收站；资源库里也会标出已经剪出过片段的原片，便于释放磁盘空间。
-- 截出的片段可以导出到指定文件夹，或在文件夹树中拖动归类。
 
 ## 功能
 
@@ -349,3 +173,179 @@ npm test         # 运行单元测试
 ## 许可
 
 本项目以 GPL-3.0-or-later 许可发布。内置的 ffmpeg 为 GPL 构建。
+
+---
+
+<h1 align="center"><a id="en"></a>Clip Goat (English)</h1>
+
+<p align="center"><a href="#zh">简体中文</a> | English</p>
+
+Clip Goat is a lightweight, hassle-free tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
+
+## Use cases
+
+Clip Goat suits any situation where the video is long and the part you need is short: game replays, screen recordings, stream archives, security footage, and footage shot on a phone.
+
+Game replays are a typical example. Features such as NVIDIA Instant Replay save the last fixed stretch of gameplay each time. A 2-minute 4K60 recording is about 700 MB, and the part worth keeping is usually only a dozen seconds or so. As recordings pile up, they become hard to find and take up a lot of disk space.
+
+<p align="center">
+  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
+</p>
+
+Clip Goat is designed around this workflow:
+
+- On launch, it lists every video in your Videos folder and its subfolders.
+- It cuts a dozen seconds or so out of a video. When the start sits on a keyframe, nothing is re-encoded and the quality is identical to the original.
+- After each export it offers to move the original to the Recycle Bin, and originals that already have clips are marked in the library, so disk space is easy to reclaim.
+- Clips can be exported to a folder you choose, or dragged between folders in the tree.
+
+## Why Clip Goat
+
+Cutting a dozen seconds out of a recording is a small job, but the usual ways of doing it are heavier than the job itself:
+
+- **Professional editors** such as Premiere Pro or DaVinci Resolve are built for full productions. To cut one clip you create a project, import the footage, place it on a timeline and choose export settings, and the export normally re-encodes the video.
+- **The ffmpeg command line** is fast and lossless, but you have to find the timestamps yourself, write the arguments by hand, and you cannot see the picture while doing it.
+- **Neither helps with the files afterwards.** Originals and clips end up mixed in the same folders, and it is hard to tell which recordings have already been dealt with.
+
+Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.
+
+Everything else is kept out of the way:
+
+- There are no projects, tracks or export settings. You open a video, drag two handles and press Enter.
+- It copies the streams instead of re-encoding whenever it can, so a short clip exports in about a second and loses no quality.
+- The clip is named automatically and saved next to the original.
+- Originals and clips appear in one folder tree, and originals that already have clips are marked.
+
+It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.
+
+## Features
+
+- **Library**: browses all videos as a folder tree, tells originals from exported clips, marks originals that already have a clip, and supports search, move, rename and delete.
+- **Clipping**: drag the start and end handles on the timeline and export the part between them.
+- **Stream copy first**: when the start sits on a keyframe, the audio and video streams are copied without re-encoding, so the quality is identical to the original. Exporting 8 seconds of a 4K60 recording takes about 1 second.
+- **Frame-exact cuts**: when the start is not on a keyframe, the range is re-encoded automatically, exact to the frame, at a bitrate no higher than the original.
+- **Joining ranges**: several ranges can be selected in one video and are merged in time order into a single file.
+- **Clips of clips**: an exported clip can be opened and cut again. Each clip records the name of its original video and the time range it came from in the file's own metadata, so a new clip is still named after the original and listed with its sibling clips, even after the original has been deleted.
+- **All audio tracks kept**: the exported file contains every audio track of the source.
+- **Formats**: MP4, MKV, MOV and WebM preview directly. For formats such as AVI and FLV, a preview file is generated first; the export still reads the original file.
+- **Bundled ffmpeg**: no separate installation is needed.
+- **Command line**: the `clip-goat` command uses the same cutting logic as the desktop app.
+- **Interface**: dark and light themes, English and Chinese.
+
+## Usage
+
+1. Open a video: drop a file onto the window, or click one in the library on the left.
+2. Select a range: drag the handles at either end of the timeline. The preview jumps to the position of the handle.
+3. Export: press Enter. A dialog shows the file name, filled in with the default; edit it if you like and press Enter again. The `.mp4` extension is fixed.
+4. Optionally delete the original: once the clip is saved, the export bar asks whether to delete the original video. "Delete original" moves it to the Recycle Bin; "Keep original" leaves it in place.
+
+By default the exported file is saved in the same folder as the source video and named `{original-name}_clip_{start}s-{end}s.mp4`, for example `Game_clip_112.5s-115.8s.mp4`. If a file with that name exists, a number is appended; nothing is overwritten.
+
+Two chips sit to the left of the Export button:
+
+- **Destination**: shows the target folder. Click it to change the folder.
+- **Export mode**: shows "Instant" (stream copy) or "Exact" (re-encode). Clicking it while it shows "Exact" moves the start back to the previous keyframe and switches to stream copy.
+
+When the pointer is over the preview, play, back and forward buttons appear in the middle of the picture. Back and forward jump 10 seconds by default; right-click either button to change this to 5, 15, 30 or 60 seconds. Inside a selected range a jump stops at the edge of the range; pressing again from the edge leaves the range. Volume and playback speed (0.25× to 2×) appear in the bottom-left corner of the picture; both apply to the preview only and do not affect exported files.
+
+While you drag the start handle, it snaps to nearby keyframes. Hold `Alt` to turn snapping off.
+
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Space` | Play or pause. When playback starts inside the selection, only the selection plays |
+| `I` / `O` | Set the start / end to the current position |
+| `M` | Mute or unmute |
+| `↑` / `↓` | Raise / lower the volume |
+| `J` / `L` | Jump back / ahead by the skip amount (10 seconds by default) without stopping playback |
+| `←` / `→` | Move one frame; hold `Shift` to move 1 second |
+| `S` | Split the range at the current position; outside a range, add a new one |
+| `Delete` | Remove the selected range |
+| `Enter` | Export |
+| `Esc` | Cancel the export |
+| `Ctrl+O` | Open a video |
+| Mouse wheel | Zoom the timeline; hold `Shift` to pan |
+
+## Command line
+
+```powershell
+clip-goat -i Game.mp4 -s 112.5 -e 115.8
+```
+
+On success the command prints the path of the exported file to standard output and exits with code 0. On failure it prints the reason to standard error and exits with a non-zero code.
+
+| Option | Description |
+|---|---|
+| `-i, --input` | Input video |
+| `-s, --start` | Start in seconds; decimals allowed |
+| `-e, --end` | End in seconds; decimals allowed |
+| `--segments` | Several ranges joined in order, written as `start-end,start-end` |
+| `-o, --output` | Output path; `.mp4`, `.mov` and `.mkv` are supported |
+| `--out-dir` | Output folder; the file name is generated automatically |
+| `--fast` | Stream copy from the nearest keyframe before the start |
+| `--force-encode` | Always re-encode |
+| `--overwrite` | Overwrite an existing output file |
+| `--json` | Print the result as JSON |
+
+Without `--fast` or `--force-encode`, the behaviour matches the desktop app: stream copy when the start sits on a keyframe, re-encode otherwise. If stream copy fails, it falls back to re-encoding.
+
+Examples:
+
+```powershell
+clip-goat -i Game.mp4 --segments 10-15,42.5-48
+clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
+```
+
+## Installation
+
+No installer has been released yet, so the app has to be built from source. Building requires Node.js 20 or later.
+
+```powershell
+git clone <repository-url>
+cd clip-goat
+npm install
+npm run dist
+```
+
+The installer is written to the `release` folder as `Clip Goat Setup x.y.z.exe`. It is not code-signed, so Windows shows a SmartScreen prompt the first time it runs.
+
+To use only the command line, run `npm link` after `npm install`. The `clip-goat` command is then available in any directory.
+
+On networks in mainland China, set these mirrors before installing the dependencies:
+
+```powershell
+$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+$env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
+$env:FFMPEG_BINARIES_URL="https://cdn.npmmirror.com/binaries/ffmpeg-static"
+npm install --registry=https://registry.npmmirror.com
+```
+
+## Known limitations
+
+- Stream copy can only start on a keyframe, so the start precision of an "Instant" export depends on the keyframe interval of the video.
+- Re-encoding produces 8-bit H.264. HDR videos look washed out after re-encoding and should be exported with stream copy.
+- The preview and the exported result may differ by one frame, more noticeably with variable-frame-rate videos.
+- When ranges are joined, each seam gains about 20 to 100 ms of extra picture. Audio and video stay in sync.
+
+## Development
+
+```powershell
+npm run dev      # development mode with hot reload; F12 opens the developer tools
+npm start        # build the interface, then launch
+npm test         # run the unit tests
+```
+
+| Directory | Contents |
+|---|---|
+| `shared/` | Cutting, video probing and file naming, shared by the desktop app and the command line |
+| `cli/` | Command-line entry point |
+| `electron/` | Main process: window, local video access, library, export jobs |
+| `renderer/` | Interface, React + Vite |
+| `assets/` | Icons and logo |
+
+The environment variables `CLIP_GOAT_FFMPEG` and `CLIP_GOAT_FFPROBE` select a different ffmpeg and ffprobe.
+
+## License
+
+Released under GPL-3.0-or-later. The bundled ffmpeg is a GPL build.
