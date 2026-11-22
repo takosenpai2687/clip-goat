@@ -32,7 +32,7 @@ Clip Goat suits any situation where the video is long and the part you need is s
 Game replays are a typical example. Features such as NVIDIA Instant Replay save the last fixed stretch of gameplay each time. A 2-minute 4K60 recording is about 700 MB, and the part worth keeping is usually only a dozen seconds or so. As recordings pile up, they become hard to find and take up a lot of disk space.
 
 <p align="center">
-  <img src="docs/screenshot-20261122-222127.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
+  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
 </p>
 
 Clip Goat is designed around this workflow:
@@ -208,7 +208,7 @@ Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游�
 以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
 
 <p align="center">
-  <img src="docs/screenshot-20261122-222127.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
+  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
 </p>
 
 Clip Goat 针对这个过程设计：
