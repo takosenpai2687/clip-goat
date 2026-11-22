@@ -4,7 +4,7 @@
 
 <p align="center"><a id="zh"></a>简体中文 | <a href="#en">English</a></p>
 
-Clip Goat 是一个轻量省心的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron 和 React 构建，同时提供命令行。
+Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron 和 React 构建，同时提供命令行。
 
 ## 适用场景
 
@@ -176,7 +176,7 @@ npm test         # 运行单元测试
 
 <p align="center"><a href="#zh">简体中文</a> | English</p>
 
-Clip Goat is a lightweight, hassle-free tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
+Clip Goat is a lightweight and efficient tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
 
 ## Use cases
 
