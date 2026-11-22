@@ -1,0 +1,68 @@
+{
+  "name": "clip-goat",
+  "version": "0.1.0",
+  "description": "Minimal video trimmer: pick a start and an end, export in seconds. Electron app + Node CLI sharing one ffmpeg core.",
+  "author": "takosenpai2687",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "main": "electron/main.js",
+  "bin": {
+    "clip-goat": "cli/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "cli": "node cli/index.js",
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "ffmpeg-static": "5.3.0",
+    "ffprobe-static": "3.1.0"
+  },
+  "build": {
+    "appId": "com.clipgoat.app",
+    "productName": "Clip Goat",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "shared/**",
+      "cli/**",
+      "renderer/dist/**",
+      "package.json",
+      "!node_modules/ffprobe-static/bin/darwin/**",
+      "!node_modules/ffprobe-static/bin/linux/**",
+      "!node_modules/ffprobe-static/bin/win32/ia32/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "lucide-react": "1.77.0",
+    "motion": "14.14.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.8"
+  }
+}
