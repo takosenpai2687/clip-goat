@@ -24,8 +24,8 @@ function flatten(trees, expanded, filter, query) {
     const childStart = rows.length;
     for (const dir of node.dirs) row.count += visit(dir, depth + 1, false, names);
     if (row.open) {
-      for (const file of files) {
-        rows.push({ type: 'file', file, depth: depth + 1, shown: shortName(file.clipped ? file.label.head : file.name, names) });
+      for (const { file, child } of grouped(files)) {
+        rows.push({ type: 'file', file, child, depth: depth + (child ? 2 : 1), shown: shortName(file.clipped ? file.label.head : file.name, names) });
       }
     } else {
       rows.length = childStart;
@@ -57,6 +57,27 @@ function MidName({ text, className }) {
       <span className="mid-tail">{text.slice(cut)}</span>
     </span>
   );
+}
+
+// Puts each clip right under the original it was cut from. Clips whose original is gone come last.
+function grouped(files) {
+  const stem = (f) => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
+  const byHead = new Map();
+  for (const f of files) {
+    if (!f.clipped) continue;
+    const key = f.label.head.toLowerCase();
+    if (!byHead.has(key)) byHead.set(key, []);
+    byHead.get(key).push(f);
+  }
+  const out = [];
+  for (const f of files) {
+    if (f.clipped) continue;
+    out.push({ file: f, child: false });
+    for (const clip of byHead.get(stem(f)) || []) out.push({ file: clip, child: true });
+    byHead.delete(stem(f));
+  }
+  for (const clips of byHead.values()) clips.forEach((clip) => out.push({ file: clip, child: false }));
+  return out;
 }
 
 function tally(trees) {
@@ -260,7 +281,7 @@ function Library({
                 <span className="tree-icon">
                   {file.clipped && <Scissors size={14} strokeWidth={1.5} aria-label={t.clipTag} />}
                 </span>
-                <MidName text={row.shown} className="file-head" />
+                {!row.child && <MidName text={row.shown} className="file-head" />}
                 {file.clipped && <span className="file-tail num">{file.label.tail}</span>}
               </button>
               {file.clips > 0 && (

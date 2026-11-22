@@ -8,6 +8,9 @@ const {
   uniquePath,
   planSegments,
   validateSegments,
+  encodeOrigin,
+  parseOrigin,
+  lineage,
 } = require('../shared');
 
 test('isClippedFile looks only at the _clip_ marker in the file name', () => {
@@ -55,4 +58,15 @@ test('validateSegments rejects bad ranges and clamps the end to the duration', (
   assert.throws(() => validateSegments([{ start: 5, end: 5 }], 120), /greater than start/);
   assert.throws(() => validateSegments([{ start: 121, end: 125 }], 120), /past the end/);
   assert.throws(() => validateSegments([], 120), /At least one/);
+});
+
+test('lineage: a clip cut from a clip points back to the original video', () => {
+  const origin = parseOrigin(encodeOrigin({ source: 'Game.mp4', segments: [{ start: 10, end: 14 }, { start: 30, end: 36 }] }));
+  assert.deepEqual(lineage(origin, 'Game_clip_10s-36s_2parts.mp4', [{ start: 1, end: 3 }]), {
+    source: 'Game.mp4',
+    segments: [{ start: 11, end: 13 }],
+  });
+  assert.deepEqual(lineage(origin, 'x.mp4', [{ start: 3, end: 6 }]).segments, [{ start: 13, end: 14 }, { start: 30, end: 32 }]);
+  assert.deepEqual(lineage(null, 'D:\\v\\Game.mp4', [{ start: 1, end: 2 }]), { source: 'Game.mp4', segments: [{ start: 1, end: 2 }] });
+  assert.equal(parseOrigin('some other comment'), null);
 });

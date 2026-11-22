@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const { ffprobePath } = require('./binaries');
 const { ClipError, run } = require('./proc');
+const { parseOrigin } = require('./naming');
 
 function parseRate(rate) {
   if (!rate) return 0;
@@ -41,6 +42,7 @@ async function probe(file, { signal } = {}) {
     startTime: Number(data.format.start_time) || 0,
     size: Number(data.format.size) || 0,
     format: data.format.format_name || '',
+    origin: parseOrigin((data.format.tags || {}).comment || (data.format.tags || {}).COMMENT),
     video: {
       codec: v.codec_name || '',
       width: Number(v.width) || 0,

@@ -47,6 +47,7 @@ Clip Goat is designed around this workflow:
 - **Stream copy first**: when the start sits on a keyframe, the audio and video streams are copied without re-encoding, so the quality is identical to the original. Exporting 8 seconds of a 4K60 recording takes about 1 second.
 - **Frame-exact cuts**: when the start is not on a keyframe, the range is re-encoded automatically, exact to the frame, at a bitrate no higher than the original.
 - **Joining ranges**: several ranges can be selected in one video and are merged in time order into a single file.
+- **Clips of clips**: an exported clip can be opened and cut again. Each clip records the name of its original video and the time range it came from in the file's own metadata, so a new clip is still named after the original and listed with its sibling clips, even after the original has been deleted.
 - **All audio tracks kept**: the exported file contains every audio track of the source.
 - **Formats**: MP4, MKV, MOV and WebM preview directly. For formats such as AVI and FLV, a preview file is generated first; the export still reads the original file.
 - **Bundled ffmpeg**: no separate installation is needed.
@@ -209,6 +210,7 @@ Clip Goat 针对这个过程设计：
 - **流复制优先**：起点位于关键帧时直接复制音视频流，不重新编码，画质与原片一致。一段 8 秒的 4K60 录像导出耗时约 1 秒。
 - **精确截取**：起点不在关键帧时，自动重新编码该片段，精确到帧，码率不超过原片。
 - **多段拼接**：一个视频可以选取多个片段，导出时按时间顺序合并为一个文件。
+- **片段可以再剪**：导出的片段可以再次打开截取。每个片段在文件自身的元数据里记录了原视频的名称和所取的时间范围，因此再剪出的片段仍以原视频命名，并和同源的片段排在一起，原视频删除后也一样。
 - **保留全部音轨**：导出文件包含原视频的所有音轨。
 - **格式支持**：MP4、MKV、MOV、WebM 可直接预览；AVI、FLV 等格式会先生成预览文件，导出时仍读取原文件。
 - **内置 ffmpeg**：不需要另外安装。

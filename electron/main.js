@@ -22,6 +22,7 @@ let win = null;
 let exportJob = null;
 let proxyJob = null;
 const keyframeCache = new Map();
+const origins = new Map();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } },
@@ -139,6 +140,7 @@ function registerIpc() {
 
   handle('media:probe', async (filePath) => {
     const info = await shared.probe(filePath);
+    origins.set(filePath, info.origin);
     return { path: filePath, name: path.basename(filePath), dir: path.dirname(filePath), url: mediaUrl(filePath), info };
   });
 
@@ -179,7 +181,8 @@ function registerIpc() {
   handle('export:plan', (input, segments, fps, outputDir) => {
     const plan = shared.planSegments(segments, cachedKeyframes(input), 'auto', fps);
     const dir = outputDir || path.dirname(input);
-    const output = shared.uniquePath(path.join(dir, shared.buildClipName(input, plan.segments)));
+    const origin = shared.lineage(origins.get(input), input, plan.segments);
+    const output = shared.uniquePath(path.join(dir, shared.buildClipName(origin.source, origin.segments)));
     return { mode: plan.mode, name: path.basename(output), dir };
   });
 

@@ -6,7 +6,7 @@ const path = require('node:path');
 const { ffmpegPath } = require('./binaries');
 const { ClipError, run } = require('./proc');
 const { probe, keyframes: readKeyframes } = require('./probe');
-const { buildClipName, defaultOutputPath, uniquePath } = require('./naming');
+const { buildClipName, uniquePath, encodeOrigin, lineage } = require('./naming');
 
 const FORMATS = { '.mp4': 'mp4', '.m4v': 'mp4', '.mov': 'mov', '.mkv': 'matroska' };
 
@@ -79,7 +79,7 @@ function planSegments(segments, keyframes, mode, fps) {
   return { mode: 'copy', segments: snapped };
 }
 
-function buildArgs({ input, seg, out, format, mode, info }) {
+function buildArgs({ input, seg, out, format, mode, info, comment }) {
   const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats'];
   // The 1ms nudge keeps a float-rounded seek from landing on the previous keyframe.
   if (seg.start > 0) args.push('-ss', (mode === 'copy' ? seg.start + 0.001 : seg.start).toFixed(6));
@@ -98,14 +98,16 @@ function buildArgs({ input, seg, out, format, mode, info }) {
       args.push('-maxrate', String(Math.round(info.video.bitrate)), '-bufsize', String(Math.round(info.video.bitrate * 2)));
     }
   }
+  if (comment) args.push('-metadata', `comment=${comment}`);
   if (format !== 'matroska') args.push('-movflags', '+faststart');
   args.push('-f', format, out);
   return args;
 }
 
-function concatArgs({ listFile, out, format, info }) {
+function concatArgs({ listFile, out, format, info, comment }) {
   const args = ['-hide_banner', '-nostdin', '-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-map', '0', '-c', 'copy'];
   if (info.video.codec === 'hevc' && format !== 'matroska') args.push('-tag:v', 'hvc1');
+  if (comment) args.push('-metadata', `comment=${comment}`);
   if (format !== 'matroska') args.push('-movflags', '+faststart');
   args.push('-f', format, out);
   return args;
@@ -134,7 +136,7 @@ async function runFfmpeg(args, { signal, onTime } = {}) {
 }
 
 // Runs one attempt (copy or encode) into tmpOut and checks the result is a real clip of the expected length.
-async function attempt({ input, segments, mode, tmpOut, format, info, signal, onProgress }) {
+async function attempt({ input, segments, mode, tmpOut, format, info, comment, signal, onProgress }) {
   const total = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
   let done = 0;
   const report = (t) => {
@@ -142,7 +144,7 @@ async function attempt({ input, segments, mode, tmpOut, format, info, signal, on
   };
 
   if (segments.length === 1) {
-    await runFfmpeg(buildArgs({ input, seg: segments[0], out: tmpOut, format, mode, info }), { signal, onTime: report });
+    await runFfmpeg(buildArgs({ input, seg: segments[0], out: tmpOut, format, mode, info, comment }), { signal, onTime: report });
   } else {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-'));
     try {
@@ -156,7 +158,7 @@ async function attempt({ input, segments, mode, tmpOut, format, info, signal, on
       }
       const listFile = path.join(dir, 'list.txt');
       fs.writeFileSync(listFile, parts.map((p) => `file '${p.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
-      await runFfmpeg(concatArgs({ listFile, out: tmpOut, format, info }), { signal });
+      await runFfmpeg(concatArgs({ listFile, out: tmpOut, format, info, comment }), { signal });
     } finally {
       rm(dir);
     }
@@ -214,16 +216,20 @@ async function clip(opts) {
   }
 
   // The file name reports the ranges actually written (copy may have moved a start to its keyframe).
-  let output;
-  if (opts.output) output = path.resolve(opts.output);
-  else if (opts.outputDir) output = path.join(path.resolve(opts.outputDir), buildClipName(input, plan.segments));
-  else output = defaultOutputPath(path.resolve(input), plan.segments);
+  // A clip cut from a clip is named after, and points back to, the original video.
+  const origin = lineage(info.origin, input, plan.segments);
+  const comment = encodeOrigin(origin);
+  const output0 = opts.output
+    ? path.resolve(opts.output)
+    : path.join(opts.outputDir ? path.resolve(opts.outputDir) : path.dirname(path.resolve(input)), buildClipName(origin.source, origin.segments));
+  let output = output0;
   const ext = path.extname(output).toLowerCase();
   const format = FORMATS[ext];
   if (!format) {
     throw new ClipError('BAD_OUTPUT_PATH', `Unsupported output extension "${ext}". Use .mp4, .mov or .mkv.`);
   }
-  if (path.resolve(input).toLowerCase() === output.toLowerCase()) {
+  // A default name that collides with the input just gets a counter below.
+  if (path.resolve(input).toLowerCase() === output.toLowerCase() && (opts.output || overwrite)) {
     throw new ClipError('BAD_OUTPUT_PATH', 'The output file must differ from the input file.');
   }
   if (!overwrite) {
@@ -235,7 +241,7 @@ async function clip(opts) {
   fs.mkdirSync(path.dirname(output), { recursive: true });
 
   const tmpOut = `${output}.part`;
-  const common = { input, tmpOut, format, info, signal, onProgress };
+  const common = { input, tmpOut, format, info, comment, signal, onProgress };
   let usedMode = plan.mode;
   let fellBack = false;
   let out;
@@ -262,6 +268,7 @@ async function clip(opts) {
     mode: usedMode,
     fellBack,
     segments: plan.segments,
+    source: origin.source,
     duration: out.duration,
     size: out.size,
   };
