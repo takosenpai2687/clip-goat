@@ -1,10 +1,11 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Maximize2, Pause, Play, Plus, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import TitleBar from './components/TitleBar';
 import Library from './components/Library';
 import Backdrop from './components/Backdrop';
+import StageControls, { SKIP_CHOICES } from './components/StageControls';
 import Timeline from './components/Timeline';
 import ExportBar from './components/ExportBar';
 import { I18nContext, STRINGS, defaultLang, errorText } from './lib/i18n';
@@ -65,6 +66,12 @@ export default function App() {
   const [plan, setPlan] = useState({ mode: 'encode', name: '' });
   const [exp, setExp] = useState(IDLE);
   const [dropping, setDropping] = useState(false);
+  const [skip, setSkip] = useState(() => {
+    const saved = Number(stored('skip', 10));
+    return SKIP_CHOICES.includes(saved) ? saved : 10;
+  });
+  const [stageHot, setStageHot] = useState(false);
+  const stageTimer = useRef(0);
 
   const t = STRINGS[lang];
   const videoRef = useRef(null);
@@ -74,7 +81,7 @@ export default function App() {
   const loadToken = useRef(0);
   const live = useRef({});
   const noticeTimer = useRef(0);
-  live.current = { doc, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
+  live.current = { doc, skip, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
 
   const duration = doc ? doc.info.duration : 0;
   const fps = doc ? doc.info.video.fps || 30 : 30;
@@ -281,6 +288,29 @@ export default function App() {
     pendingSeek.current = null;
     videoRef.current.currentTime = target;
   };
+
+  // Jump back or ahead without stopping playback. Leaves selection-only playback so the jump is not pulled back.
+  const skipBy = useCallback(
+    (dir) => {
+      const { doc: current, skip: amount, time: now } = live.current;
+      if (!current) return;
+      previewing.current = false;
+      const base = pendingSeek.current ?? (videoRef.current ? videoRef.current.currentTime : now);
+      seek(clamp(base + dir * amount, 0, Math.max(0, current.info.duration - 0.01)));
+    },
+    [seek],
+  );
+
+  // Stage controls show while the pointer moves over the picture and fade after it rests.
+  const wakeStage = useCallback(() => {
+    setStageHot(true);
+    clearTimeout(stageTimer.current);
+    stageTimer.current = setTimeout(() => setStageHot(false), 2200);
+  }, []);
+  const sleepStage = useCallback(() => {
+    clearTimeout(stageTimer.current);
+    setStageHot(false);
+  }, []);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -489,6 +519,7 @@ export default function App() {
 
   useEffect(() => localStorage.setItem('expanded', JSON.stringify([...expanded])), [expanded]);
   useEffect(() => localStorage.setItem('dest', dest || ''), [dest]);
+  useEffect(() => localStorage.setItem('skip', String(skip)), [skip]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -541,6 +572,14 @@ export default function App() {
           if (videoRef.current) videoRef.current.pause();
           seek(clamp(now + (event.key === 'ArrowLeft' ? -step : step), 0, current.info.duration));
           break;
+        case 'j':
+        case 'J':
+          skipBy(-1);
+          break;
+        case 'l':
+        case 'L':
+          skipBy(1);
+          break;
         case 'i':
         case 'I':
           markEdge('start');
@@ -576,7 +615,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mouseup', dropFocus);
     };
-  }, [togglePlay, seek, markEdge, addRange, removeRange, runExport, dismissResult, cancelExport, pickFile]);
+  }, [togglePlay, skipBy, seek, markEdge, addRange, removeRange, runExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
     const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
@@ -662,7 +701,11 @@ export default function App() {
             </AnimatePresence>
 
             <main className="workspace">
-              <section className={`stage${doc ? '' : ' is-empty glass'}${dropping ? ' is-dropping' : ''}`}>
+              <section
+                className={`stage${doc ? '' : ' is-empty glass'}${dropping ? ' is-dropping' : ''}`}
+                onPointerMove={wakeStage}
+                onPointerLeave={sleepStage}
+              >
                 <AnimatePresence>
                   {doc && src && (
                     <motion.video
@@ -688,6 +731,17 @@ export default function App() {
                     />
                   )}
                 </AnimatePresence>
+
+                {doc && load.status === 'ready' && (
+                  <StageControls
+                    visible={stageHot && !locked}
+                    playing={playing}
+                    skip={skip}
+                    onToggle={togglePlay}
+                    onSkip={skipBy}
+                    onSkipChange={setSkip}
+                  />
+                )}
 
                 <AnimatePresence>
                   {busyText && (

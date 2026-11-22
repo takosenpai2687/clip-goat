@@ -1,4 +1,4 @@
-﻿/* Glass over a drifting colour backdrop. The video stage itself stays opaque black so nothing tints the picture. */
+/* Glass over a drifting colour backdrop. The video stage itself stays opaque black so nothing tints the picture. */
 :root {
   --ground: #05070b;
   --ground-2: #080c14;
@@ -698,6 +698,52 @@ button:disabled {
   height: 100%;
   object-fit: contain;
 }
+.stage-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  pointer-events: none;
+}
+.stage-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  pointer-events: auto;
+  transition:
+    background-color 140ms var(--ease),
+    transform 140ms var(--ease);
+}
+.stage-button:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.06);
+}
+.stage-button:active {
+  transform: scale(0.94);
+}
+.stage-button.is-main {
+  width: 76px;
+  height: 76px;
+}
+.stage-button.is-side {
+  width: 60px;
+  height: 60px;
+}
+.skip-amount {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .stage-note {
   position: absolute;
   left: 24px;

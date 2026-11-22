@@ -41,6 +41,10 @@ const zh = {
 
   play: '播放（空格）',
   pause: '暂停（空格）',
+  rewind: (n) => `后退 ${n} 秒（J）`,
+  forward: (n) => `前进 ${n} 秒（L）`,
+  skipHint: '右键可更改跨度',
+  skipSeconds: (n) => `${n} 秒`,
   addRange: '在播放头处添加或切开片段（S）',
   removeRange: '删除选中的片段（Delete）',
   zoomIn: '放大时间轨',
@@ -118,6 +122,10 @@ const en = {
 
   play: 'Play (Space)',
   pause: 'Pause (Space)',
+  rewind: (n) => `Back ${n} seconds (J)`,
+  forward: (n) => `Forward ${n} seconds (L)`,
+  skipHint: 'Right-click to change the amount',
+  skipSeconds: (n) => `${n} seconds`,
   addRange: 'Add or split a range at the playhead (S)',
   removeRange: 'Remove the selected range (Delete)',
   zoomIn: 'Zoom in the timeline',
