@@ -49,7 +49,7 @@ Two chips sit to the left of the Export button:
 - **Destination**: shows the target folder. Click it to change the folder.
 - **Export mode**: shows "Instant" (stream copy) or "Exact" (re-encode). Clicking it while it shows "Exact" moves the start back to the previous keyframe and switches to stream copy.
 
-When the pointer is over the preview, play, back and forward buttons appear in the middle of the picture. Back and forward jump 10 seconds by default; right-click either button to change this to 5, 15, 30 or 60 seconds.
+When the pointer is over the preview, play, back and forward buttons appear in the middle of the picture. Back and forward jump 10 seconds by default; right-click either button to change this to 5, 15, 30 or 60 seconds. Volume and playback speed (0.25× to 2×) appear in the bottom-left corner of the picture; both apply to the preview only and do not affect exported files.
 
 While you drag the start handle, it snaps to nearby keyframes. Hold `Alt` to turn snapping off.
 
@@ -59,6 +59,8 @@ While you drag the start handle, it snaps to nearby keyframes. Hold `Alt` to tur
 |---|---|
 | `Space` | Play or pause. When playback starts inside the selection, only the selection plays |
 | `I` / `O` | Set the start / end to the current position |
+| `M` | Mute or unmute |
+| `↑` / `↓` | Raise / lower the volume |
 | `J` / `L` | Jump back / ahead by the skip amount (10 seconds by default) without stopping playback |
 | `←` / `→` | Move one frame; hold `Shift` to move 1 second |
 | `S` | Split the range at the current position; outside a range, add a new one |

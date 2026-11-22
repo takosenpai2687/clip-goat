@@ -5,7 +5,7 @@ import { Maximize2, Pause, Play, Plus, Trash2, ZoomIn, ZoomOut } from 'lucide-re
 import TitleBar from './components/TitleBar';
 import Library from './components/Library';
 import Backdrop from './components/Backdrop';
-import StageControls, { SKIP_CHOICES } from './components/StageControls';
+import StageControls, { RATE_CHOICES, SKIP_CHOICES } from './components/StageControls';
 import Timeline from './components/Timeline';
 import ExportBar from './components/ExportBar';
 import { I18nContext, STRINGS, defaultLang, errorText } from './lib/i18n';
@@ -69,6 +69,12 @@ export default function App() {
   const [skip, setSkip] = useState(() => {
     const saved = Number(stored('skip', 10));
     return SKIP_CHOICES.includes(saved) ? saved : 10;
+  });
+  const [volume, setVolume] = useState(() => clamp(Number(stored('volume', 1)) || 0, 0, 1));
+  const [muted, setMuted] = useState(() => stored('muted', '0') === '1');
+  const [rate, setRate] = useState(() => {
+    const saved = Number(stored('rate', 1));
+    return RATE_CHOICES.includes(saved) ? saved : 1;
   });
   const [stageHot, setStageHot] = useState(false);
   const stageTimer = useRef(0);
@@ -521,6 +527,28 @@ export default function App() {
   useEffect(() => localStorage.setItem('dest', dest || ''), [dest]);
   useEffect(() => localStorage.setItem('skip', String(skip)), [skip]);
 
+  // Volume and speed belong to the preview only; exports are never affected.
+  useEffect(() => {
+    localStorage.setItem('volume', String(volume));
+    localStorage.setItem('muted', muted ? '1' : '0');
+    localStorage.setItem('rate', String(rate));
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = volume;
+    video.muted = muted;
+    video.playbackRate = rate;
+  }, [volume, muted, rate, src, load.status]);
+
+  const changeVolume = useCallback((value) => {
+    setVolume(clamp(value, 0, 1));
+    setMuted(false);
+  }, []);
+  // Unmuting from zero volume would stay silent, so bring it back to an audible level.
+  const toggleMute = useCallback(() => {
+    setMuted((prev) => !prev);
+    setVolume((prev) => (prev === 0 ? 0.5 : prev));
+  }, []);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('theme', theme);
@@ -572,6 +600,17 @@ export default function App() {
           if (videoRef.current) videoRef.current.pause();
           seek(clamp(now + (event.key === 'ArrowLeft' ? -step : step), 0, current.info.duration));
           break;
+        case 'm':
+        case 'M':
+          toggleMute();
+          break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+          event.preventDefault();
+          setMuted(false);
+          setVolume((prev) => clamp(Math.round((prev + (event.key === 'ArrowUp' ? 0.05 : -0.05)) * 100) / 100, 0, 1));
+          wakeStage();
+          break;
         case 'j':
         case 'J':
           skipBy(-1);
@@ -615,7 +654,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mouseup', dropFocus);
     };
-  }, [togglePlay, skipBy, seek, markEdge, addRange, removeRange, runExport, dismissResult, cancelExport, pickFile]);
+  }, [togglePlay, skipBy, toggleMute, wakeStage, seek, markEdge, addRange, removeRange, runExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
     const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
@@ -740,6 +779,12 @@ export default function App() {
                     onToggle={togglePlay}
                     onSkip={skipBy}
                     onSkipChange={setSkip}
+                    volume={volume}
+                    muted={muted}
+                    onVolume={changeVolume}
+                    onMute={toggleMute}
+                    rate={rate}
+                    onRate={setRate}
                   />
                 )}
 
