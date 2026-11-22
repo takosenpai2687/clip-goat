@@ -295,14 +295,20 @@ export default function App() {
     videoRef.current.currentTime = target;
   };
 
-  // Jump back or ahead without stopping playback. Leaves selection-only playback so the jump is not pulled back.
+  // Jump back or ahead without stopping playback. Inside a range the jump stops at the range's edge,
+  // so reviewing a clip never flies out of it; a second press from the edge leaves the range.
   const skipBy = useCallback(
     (dir) => {
-      const { doc: current, skip: amount, time: now } = live.current;
+      const { doc: current, skip: amount, time: now, segments: segs } = live.current;
       if (!current) return;
-      previewing.current = false;
       const base = pendingSeek.current ?? (videoRef.current ? videoRef.current.currentTime : now);
-      seek(clamp(base + dir * amount, 0, Math.max(0, current.info.duration - 0.01)));
+      const edge = 0.06;
+      const seg = segs.find((s) => base >= s.start - edge && base <= s.end + edge);
+      let target = base + dir * amount;
+      if (seg && dir > 0 && base < seg.end - edge) target = Math.min(target, seg.end);
+      else if (seg && dir < 0 && base > seg.start + edge) target = Math.max(target, seg.start);
+      else previewing.current = false;
+      seek(clamp(target, 0, Math.max(0, current.info.duration - 0.01)));
     },
     [seek],
   );
