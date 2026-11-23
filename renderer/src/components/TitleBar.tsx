@@ -39,6 +39,9 @@ function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, on
       </h1>
 
       <div className="titlebar-right">
+        <span className="app-version num" title={t.currentVersion(__APP_VERSION__)}>
+          v{__APP_VERSION__}
+        </span>
         <button type="button" className="icon-button" onClick={onCheckUpdate} aria-label={t.checkUpdate} title={t.checkUpdate}>
           <CircleArrowUp size={16} strokeWidth={1.5} />
         </button>

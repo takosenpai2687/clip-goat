@@ -251,6 +251,12 @@ button:disabled {
   border-radius: 6px;
   -webkit-user-drag: none;
 }
+.app-version {
+  margin-right: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
 .brand {
   margin-left: 6px;
   font-weight: 600;
@@ -1001,7 +1007,7 @@ button:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 16px;
+  height: 18px;
   cursor: pointer;
   touch-action: none;
 }
@@ -1012,24 +1018,28 @@ button:disabled {
   bottom: 0;
   height: 3px;
   background: rgba(255, 255, 255, 0.2);
-  transition: height 140ms var(--ease);
+  transition:
+    height 140ms var(--ease),
+    bottom 140ms var(--ease);
 }
 .stage-progress:hover .stage-progress-track,
 .stage-progress.is-dragging .stage-progress-track {
+  /* Lifts off the edge so the thumb, centred on the bar, is never cut off by the picture's frame. */
+  bottom: 4px;
   height: 6px;
 }
 .stage-progress-fill {
-  width: var(--at);
+  width: var(--fill);
   height: 100%;
   background: linear-gradient(to right, color-mix(in srgb, var(--accent) 15%, transparent), var(--accent)); /* taste-skill-ignore: the user asked for a fading progress bar */
 }
 .stage-progress-thumb {
   position: absolute;
   left: var(--at);
-  bottom: -3px;
-  width: 12px;
-  height: 12px;
-  margin-left: -6px;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
   border-radius: 50%;
   background: #ffffff;
   transform: scale(0);
