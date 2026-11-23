@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { FilePlus, Moon, PanelLeft, Sun } from 'lucide-react';
+import { Download, FilePlus, Moon, PanelLeft, Sun } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import type { Theme } from '../../../shared/types';
 import icon from '../assets/icon.webp';
@@ -12,10 +12,11 @@ interface TitleBarProps {
   onSidebar: () => void;
   sidebarOpen: boolean;
   onOpenFile: () => void;
+  onCheckUpdate: () => void;
   platform: string;
 }
 
-function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, onOpenFile, platform }: TitleBarProps) {
+function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, onOpenFile, onCheckUpdate, platform }: TitleBarProps) {
   const t = useT();
   return (
     <header className={`titlebar platform-${platform}`}>
@@ -41,6 +42,9 @@ function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, on
       <div className="titlebar-right">
         <button type="button" className="icon-button" onClick={onOpenFile} aria-label={t.openVideo} title={`${t.openVideo} (Ctrl+O)`}>
           <FilePlus size={16} strokeWidth={1.5} />
+        </button>
+        <button type="button" className="icon-button" onClick={onCheckUpdate} aria-label={t.checkUpdate} title={t.checkUpdate}>
+          <Download size={16} strokeWidth={1.5} />
         </button>
         <button type="button" className="icon-button text-button" onClick={onLang} aria-label={t.toggleLang} title={t.toggleLang}>
           {t.langLabel}

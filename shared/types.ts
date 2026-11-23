@@ -88,12 +88,20 @@ export interface ExportJob {
 export type ProxyLevel = 'remux' | 'transcode';
 export type Theme = 'dark' | 'light';
 
+export interface UpdateInfo {
+  /** available: a newer version exists; none: already current; unsupported: not an installed build. */
+  status: 'available' | 'none' | 'unsupported';
+  current: string;
+  version: string;
+}
+
 /** Events the main process pushes to the page, with their payloads. */
 export interface ApiEvents {
   'export:progress': ClipProgress;
   'media:proxy-progress': { path: string; percent: number };
   'library:changed': undefined;
   'app:open-file': string;
+  'update:progress': { percent: number };
 }
 
 /** The API the preload script exposes to the page as window.clipgoat. */
@@ -118,5 +126,8 @@ export interface ClipGoatApi {
   showInFolder(filePath: string): Promise<void>;
   setTheme(theme: Theme): Promise<void>;
   initialFile(): Promise<string | null>;
+  checkUpdate(): Promise<UpdateInfo>;
+  downloadUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
   on<K extends keyof ApiEvents>(channel: K, listener: (payload: ApiEvents[K]) => void): () => void;
 }

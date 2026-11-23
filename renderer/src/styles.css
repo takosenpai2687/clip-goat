@@ -826,6 +826,19 @@ button:disabled {
 .toast-action:hover {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
+.toast-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.toast-close:hover {
+  background: var(--raised);
+  color: var(--text);
+}
 .toast-action kbd {
   font: inherit;
   font-size: 11px;

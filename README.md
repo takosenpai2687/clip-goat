@@ -4,7 +4,7 @@
 
 <p align="center"><a id="zh"></a>简体中文 | <a href="#en">English</a></p>
 
-Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron 和 React 构建，同时提供命令行。
+Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron、React 和 TypeScript 构建，同时提供命令行。
 
 ## 适用场景
 
@@ -54,6 +54,7 @@ Clip Goat 针对这个过程设计：
 - 🔊 **保留全部音轨**
 - 🎞️ **常见格式**：MP4、MKV、MOV、WebM、AVI、FLV 等
 - 📦 **内置 ffmpeg**：不需要另外安装
+- 🔄 **一键更新**：启动时自动检查新版本，也可以点标题栏的下载图标手动检查；确认后自动下载并安装
 - ⌨️ **命令行**：`clip-goat` 命令，与桌面应用共用裁切逻辑
 - 🌗 **界面**：深色和浅色主题，中文和英文
 
@@ -120,18 +121,24 @@ clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
 
 ## 安装
 
-本项目尚未发布安装包，需要从源码构建。构建环境要求 Node.js 20 或以上。
+从 [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) 页面下载 `Clip-Goat-Setup-x.y.z.exe` 并运行（Windows 10/11，64 位）。安装包没有代码签名，首次运行时 Windows 会显示 SmartScreen 提示，选择"更多信息 → 仍要运行"。
+
+0.2.0 及以后的版本可以在应用内更新，不需要重新下载安装包。0.1.0 没有这个功能，需要手动安装一次新版本。
+
+### 从源码构建
+
+构建环境要求 Node.js 20 或以上。
 
 ```powershell
-git clone <仓库地址>
+git clone https://github.com/takosenpai2687/clip-goat.git
 cd clip-goat
 npm install
 npm run dist
 ```
 
-安装包生成在 `release` 文件夹中，文件名为 `Clip Goat Setup x.y.z.exe`。安装包没有代码签名，首次运行时 Windows 会显示 SmartScreen 提示。
+安装包生成在 `release` 文件夹中，文件名为 `Clip-Goat-Setup-x.y.z.exe`。
 
-只使用命令行时，执行 `npm install` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
+只使用命令行时，执行 `npm install` 和 `npm run build` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
 
 中国大陆的网络环境下，安装依赖前需要设置镜像：
 
@@ -152,17 +159,19 @@ npm install --registry=https://registry.npmmirror.com
 ## 开发
 
 ```powershell
-npm run dev      # 开发模式，界面热更新，F12 打开开发者工具
-npm start        # 构建界面后启动
-npm test         # 运行单元测试
+npm run dev        # 开发模式，界面热更新，F12 打开开发者工具
+npm start          # 构建后启动
+npm test           # 运行单元测试
+npm run typecheck  # 类型检查
 ```
 
 | 目录 | 内容 |
 |---|---|
 | `shared/` | 裁切、视频信息读取、文件命名，桌面应用和命令行共用 |
 | `cli/` | 命令行入口 |
-| `electron/` | 主进程：窗口、本地视频读取、资源库、导出任务 |
+| `electron/` | 主进程：窗口、本地视频读取、资源库、导出任务、自动更新 |
 | `renderer/` | 界面，React + Vite |
+| `dist/` | TypeScript 编译产物（不入库） |
 | `assets/` | 图标和标志 |
 
 环境变量 `CLIP_GOAT_FFMPEG` 和 `CLIP_GOAT_FFPROBE` 可以指定使用其他的 ffmpeg 和 ffprobe。
@@ -177,7 +186,7 @@ npm test         # 运行单元测试
 
 <p align="center"><a href="#zh">简体中文</a> | English</p>
 
-Clip Goat is a lightweight and efficient tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron and React, and ships with a command-line interface.
+Clip Goat is a lightweight and efficient tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron, React and TypeScript, and ships with a command-line interface.
 
 ## Use cases
 
@@ -227,6 +236,7 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 - 🔊 **All audio tracks kept**
 - 🎞️ **Common formats**: MP4, MKV, MOV, WebM, AVI, FLV and more
 - 📦 **Bundled ffmpeg**: no separate installation
+- 🔄 **One-click updates**: checks for a new version on launch, or on demand from the download icon in the title bar; downloads and installs it once you confirm
 - ⌨️ **Command line**: the `clip-goat` command shares the cutting logic of the desktop app
 - 🌗 **Interface**: dark and light themes, English and Chinese
 
@@ -293,18 +303,24 @@ clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
 
 ## Installation
 
-No installer has been released yet, so the app has to be built from source. Building requires Node.js 20 or later.
+Download `Clip-Goat-Setup-x.y.z.exe` from the [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) page and run it (Windows 10/11, 64-bit). The installer is not code-signed, so Windows shows a SmartScreen prompt the first time it runs; choose "More info → Run anyway".
+
+Version 0.2.0 and later update themselves from inside the app, so the installer does not have to be downloaded again. Version 0.1.0 does not have this and needs one manual install of a newer version.
+
+### Building from source
+
+Building requires Node.js 20 or later.
 
 ```powershell
-git clone <repository-url>
+git clone https://github.com/takosenpai2687/clip-goat.git
 cd clip-goat
 npm install
 npm run dist
 ```
 
-The installer is written to the `release` folder as `Clip Goat Setup x.y.z.exe`. It is not code-signed, so Windows shows a SmartScreen prompt the first time it runs.
+The installer is written to the `release` folder as `Clip-Goat-Setup-x.y.z.exe`.
 
-To use only the command line, run `npm link` after `npm install`. The `clip-goat` command is then available in any directory.
+To use only the command line, run `npm install` and `npm run build`, then `npm link`. The `clip-goat` command is then available in any directory.
 
 On networks in mainland China, set these mirrors before installing the dependencies:
 
@@ -325,17 +341,19 @@ npm install --registry=https://registry.npmmirror.com
 ## Development
 
 ```powershell
-npm run dev      # development mode with hot reload; F12 opens the developer tools
-npm start        # build the interface, then launch
-npm test         # run the unit tests
+npm run dev        # development mode with hot reload; F12 opens the developer tools
+npm start          # build, then launch
+npm test           # run the unit tests
+npm run typecheck  # type-check the whole project
 ```
 
 | Directory | Contents |
 |---|---|
 | `shared/` | Cutting, video probing and file naming, shared by the desktop app and the command line |
 | `cli/` | Command-line entry point |
-| `electron/` | Main process: window, local video access, library, export jobs |
+| `electron/` | Main process: window, local video access, library, export jobs, updates |
 | `renderer/` | Interface, React + Vite |
+| `dist/` | Compiled TypeScript output (not committed) |
 | `assets/` | Icons and logo |
 
 The environment variables `CLIP_GOAT_FFMPEG` and `CLIP_GOAT_FFPROBE` select a different ffmpeg and ffprobe.

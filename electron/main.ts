@@ -7,6 +7,7 @@ import { Readable } from 'node:stream';
 import * as shared from '../shared';
 import type { ApiEvents, ExportJob, ExportPlan, MediaDoc, Origin, ProxyLevel, Segment, Theme } from '../shared';
 import * as library from './library';
+import { createUpdater } from './updater';
 
 // Compiled to dist/electron, so the project root sits two folders up.
 const ROOT = path.join(__dirname, '..', '..');
@@ -106,6 +107,7 @@ function handle(channel: string, fn: (...args: any[]) => unknown): void {
 }
 
 const watcher = library.createWatcher(() => send('library:changed'));
+const updater = createUpdater((percent) => send('update:progress', { percent }));
 
 async function getKeyframes(filePath: string, startTime: number): Promise<number[]> {
   const stat = await fs.promises.stat(filePath);
@@ -246,6 +248,10 @@ function registerIpc(): void {
   });
 
   handle('app:initialFile', () => initialFile(process.argv));
+
+  handle('update:check', () => updater.check());
+  handle('update:download', () => updater.download());
+  handle('update:install', () => updater.install());
 }
 
 function createWindow(): void {

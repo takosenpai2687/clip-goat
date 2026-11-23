@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { ApiEvents, ClipGoatApi } from '../shared/types';
 
-const EVENTS: (keyof ApiEvents)[] = ['export:progress', 'media:proxy-progress', 'library:changed', 'app:open-file'];
+const EVENTS: (keyof ApiEvents)[] = ['export:progress', 'media:proxy-progress', 'library:changed', 'app:open-file', 'update:progress'];
 
 interface Reply<T> {
   ok: boolean;
@@ -36,6 +36,9 @@ const api: ClipGoatApi = {
   showInFolder: (filePath) => call('shell:show', filePath),
   setTheme: (theme) => call('window:theme', theme),
   initialFile: () => call('app:initialFile'),
+  checkUpdate: () => call('update:check'),
+  downloadUpdate: () => call('update:download'),
+  installUpdate: () => call('update:install'),
   on(channel, listener) {
     if (!EVENTS.includes(channel)) return () => {};
     const wrapped = (_event: IpcRendererEvent, payload: unknown) => listener(payload as never);

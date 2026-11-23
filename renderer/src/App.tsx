@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { Maximize2, Pause, Play, Plus, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize2, Pause, Play, Plus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import TitleBar from './components/TitleBar';
 import Library, { type Filter } from './components/Library';
 import Backdrop from './components/Backdrop';
@@ -28,10 +28,20 @@ interface Naming {
   dir: string;
 }
 
+interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 interface Toast {
   text: string;
   canUndo: boolean;
   id: number;
+  action?: ToastAction;
+  /** Stays until dismissed or replaced. */
+  sticky?: boolean;
+  /** Shows download progress and is updated in place. */
+  progress?: boolean;
 }
 
 /** A delete or rename that Ctrl+Z can take back. */
@@ -171,11 +181,55 @@ export default function App() {
     noticeTimer.current = setTimeout(() => setNotice(''), 4000);
   }, []);
 
-  const showToast = useCallback((text: string, canUndo = false) => {
-    setToast({ text, canUndo, id: Date.now() });
+  const showToast = useCallback((text: string, canUndo = false, extra: Partial<Toast> = {}) => {
+    setToast({ text, canUndo, id: Date.now(), ...extra });
     clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 7000);
+    if (!extra.sticky) toastTimer.current = setTimeout(() => setToast(null), 7000);
   }, []);
+
+  /* ---------- updates ---------- */
+
+  const startUpdate = useCallback(async () => {
+    const text = live.current.t;
+    showToast(text.updateDownloading(0), false, { sticky: true, progress: true });
+    try {
+      await api.downloadUpdate();
+      showToast(text.updateReady, false, { sticky: true, action: { label: text.updateInstall, run: () => api.installUpdate() } });
+    } catch {
+      showToast(text.updateFailed);
+    }
+  }, [showToast]);
+
+  // silent: the automatic check at startup, which only speaks up when there is something to install.
+  const checkUpdate = useCallback(
+    async (silent: boolean) => {
+      const text = live.current.t;
+      if (!silent) showToast(text.updateChecking, false, { sticky: true });
+      try {
+        const info = await api.checkUpdate();
+        if (info.status === 'available') {
+          showToast(text.updateAvailable(info.version), false, { sticky: true, action: { label: text.updateNow, run: startUpdate } });
+        } else if (!silent) {
+          showToast(info.status === 'none' ? text.updateNone(info.current) : text.updateUnsupported);
+        }
+      } catch {
+        if (!silent) showToast(text.updateFailed);
+      }
+    },
+    [showToast, startUpdate],
+  );
+  const checkUpdateNow = useCallback(() => checkUpdate(false), [checkUpdate]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => checkUpdate(true), 4000);
+    const off = api.on('update:progress', (p) =>
+      setToast((prev) => (prev && prev.progress ? { ...prev, text: live.current.t.updateDownloading(Math.round(p.percent)) } : prev)),
+    );
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, [checkUpdate]);
 
   const toggleDir = useCallback((dir: string) => {
     setExpanded((prev) => {
@@ -873,6 +927,7 @@ export default function App() {
             onSidebar={toggleSidebar}
             sidebarOpen={sidebarOpen}
             onOpenFile={pickFile}
+            onCheckUpdate={checkUpdateNow}
             platform={api.platform}
           />
 
@@ -1110,6 +1165,16 @@ export default function App() {
                 <button type="button" className="toast-action" onClick={undo}>
                   {t.undo}
                   <kbd>Ctrl+Z</kbd>
+                </button>
+              )}
+              {toast.action && (
+                <button type="button" className="toast-action" onClick={toast.action.run}>
+                  {toast.action.label}
+                </button>
+              )}
+              {toast.sticky && !toast.progress && (
+                <button type="button" className="toast-close" onClick={() => setToast(null)} aria-label={t.dismiss} title={t.dismiss}>
+                  <X size={14} strokeWidth={1.5} />
                 </button>
               )}
             </motion.div>
