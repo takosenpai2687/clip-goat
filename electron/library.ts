@@ -12,7 +12,7 @@ function fail(message: string, code: string): never {
   throw Object.assign(new Error(message), { code });
 }
 
-const byName = (a: LibraryDir, b: LibraryDir): number => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+const byName = (a: { name: string }, b: { name: string }): number => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 
 // Returns a folder node, or null when the folder holds no video anywhere below it.
 async function scanDir(dir: string, depth: number, budget: { left: number }, hidden: Set<string>): Promise<LibraryDir | null> {
@@ -48,7 +48,7 @@ async function scanDir(dir: string, depth: number, budget: { left: number }, hid
   }
   if (!files.length && !dirs.length && depth > 0) return null;
   dirs.sort(byName);
-  files.sort((a, b) => b.mtime - a.mtime);
+  files.sort(byName);
   return {
     path: dir,
     name: path.basename(dir) || dir,
