@@ -1,7 +1,7 @@
-import { memo, useState } from 'react';
+import { memo, useState, type MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Pause, Play, RotateCcw, RotateCw, Volume1, Volume2, VolumeX } from 'lucide-react';
-import Menu from './Menu';
+import Menu, { type MenuState } from './Menu';
 import { useT } from '../lib/i18n';
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 60];
@@ -11,12 +11,27 @@ const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity
 
 // Controls that float over the picture while the pointer is on it:
 // play/pause and skip in the middle, volume and speed in the bottom-left corner.
-function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate }) {
+interface StageControlsProps {
+  visible: boolean;
+  playing: boolean;
+  skip: number;
+  onToggle: () => void;
+  onSkip: (dir: 1 | -1) => void;
+  onSkipChange: (seconds: number) => void;
+  volume: number;
+  muted: boolean;
+  onVolume: (value: number) => void;
+  onMute: () => void;
+  rate: number;
+  onRate: (rate: number) => void;
+}
+
+function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate }: StageControlsProps) {
   const t = useT();
-  const [menu, setMenu] = useState(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
   const silent = muted || volume === 0;
 
-  const openSkipMenu = (event) => {
+  const openSkipMenu = (event: MouseEvent) => {
     event.preventDefault();
     setMenu({
       x: event.clientX,
@@ -25,7 +40,7 @@ function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange,
     });
   };
 
-  const openRateMenu = (event) => {
+  const openRateMenu = (event: MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({
       x: rect.left,
@@ -34,7 +49,7 @@ function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange,
     });
   };
 
-  const side = (dir) => (
+  const side = (dir: 1 | -1) => (
     <button
       type="button"
       className="stage-button is-side"

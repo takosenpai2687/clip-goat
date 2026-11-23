@@ -1,23 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import { useT } from '../lib/i18n';
 
 const BAD_NAME = /[\\/:*?"<>|]/;
 
 // Asks for the clip's file name before exporting. Only the name is editable; the extension is fixed.
-export default function NameDialog({ stem, ext, dir, onConfirm, onCancel }) {
+interface NameDialogProps {
+  stem: string;
+  ext: string;
+  dir: string;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+}
+
+export default function NameDialog({ stem, ext, dir, onConfirm, onCancel }: NameDialogProps) {
   const t = useT();
   const [value, setValue] = useState(stem);
-  const input = useRef(null);
+  const input = useRef<HTMLInputElement>(null);
   const name = value.trim();
   const invalid = !name || BAD_NAME.test(name) || name.endsWith('.');
 
   useEffect(() => {
-    input.current.focus();
-    input.current.select();
+    input.current?.focus();
+    input.current?.select();
   }, []);
 
-  const submit = (event) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!invalid) onConfirm(name);
   };

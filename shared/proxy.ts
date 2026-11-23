@@ -1,14 +1,22 @@
-'use strict';
+import fs from 'node:fs';
+import { ffmpegPath } from './binaries';
+import { ClipError, run } from './proc';
+import type { ProxyLevel } from './types';
 
-const fs = require('node:fs');
-const { ffmpegPath } = require('./binaries');
-const { ClipError, run } = require('./proc');
+export interface ProxyOptions {
+  input: string;
+  output: string;
+  level: ProxyLevel;
+  duration: number;
+  onProgress?: (p: { percent: number }) => void;
+  signal?: AbortSignal;
+}
 
 // Builds an MP4 the <video> tag can play when it cannot play the source.
 //  level 'remux'     -> stream copy into MP4 (seconds; fixes container-only problems such as MKV)
 //  level 'transcode' -> 720p H.264 proxy (slower; fixes unsupported codecs)
 // Export always reads the original file, so the proxy never affects output quality.
-async function makePreviewProxy({ input, output, level, duration, onProgress, signal }) {
+export async function makePreviewProxy({ input, output, level, duration, onProgress, signal }: ProxyOptions): Promise<string> {
   const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats', '-i', input, '-map', '0:v:0', '-map', '0:a:0?'];
   if (level === 'remux') {
     args.push('-c', 'copy');
@@ -40,5 +48,3 @@ async function makePreviewProxy({ input, output, level, duration, onProgress, si
     throw err;
   }
 }
-
-module.exports = { makePreviewProxy };

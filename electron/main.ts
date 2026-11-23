@@ -1,51 +1,58 @@
-'use strict';
+import { app, BrowserWindow, Menu, ipcMain, dialog, shell, protocol } from 'electron';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { Readable } from 'node:stream';
+import * as shared from '../shared';
+import type { ApiEvents, ExportJob, ExportPlan, MediaDoc, Origin, ProxyLevel, Segment, Theme } from '../shared';
+import * as library from './library';
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell, protocol } = require('electron');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const crypto = require('node:crypto');
-const { Readable } = require('node:stream');
-const shared = require('../shared');
-const library = require('./library');
-
+// Compiled to dist/electron, so the project root sits two folders up.
+const ROOT = path.join(__dirname, '..', '..');
 const DEV_URL = process.env.CLIP_GOAT_DEV_URL;
 const PREVIEW_DIR = path.join(os.tmpdir(), 'clip-goat-preview');
-const MIME = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
+const MIME: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+  '.mkv': 'video/x-matroska',
+};
 // The caption-button strip is transparent so the app's own backdrop shows through it.
-const TITLEBAR = {
+const TITLEBAR: Record<Theme, { color: string; symbolColor: string; background: string }> = {
   dark: { color: '#00000000', symbolColor: '#c8ccd2', background: '#05070b' },
   light: { color: '#00000000', symbolColor: '#4a4f57', background: '#eef1f5' },
 };
 
-let win = null;
-let exportJob = null;
-let proxyJob = null;
-const keyframeCache = new Map();
-const origins = new Map();
+let win: BrowserWindow | null = null;
+let exportJob: AbortController | null = null;
+let proxyJob: AbortController | null = null;
+const keyframeCache = new Map<string, { mtime: number; times: number[] }>();
+const origins = new Map<string, Origin | null>();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
-function mediaUrl(filePath) {
+function mediaUrl(filePath: string): string {
   return `media://local/${encodeURIComponent(filePath)}`;
 }
 
 // Streams local video with Range support so <video> can seek without loading the file into memory.
-async function serveMedia(request) {
+async function serveMedia(request: Request): Promise<Response> {
   const filePath = decodeURIComponent(new URL(request.url).pathname.slice(1));
   const inPreviewDir = path.dirname(filePath) === PREVIEW_DIR;
   if (!inPreviewDir && !shared.isVideoFile(filePath)) return new Response('Forbidden', { status: 403 });
 
-  let stat;
+  let stat: fs.Stats;
   try {
     stat = await fs.promises.stat(filePath);
   } catch {
     return new Response('Not found', { status: 404 });
   }
 
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'video/mp4',
     'Accept-Ranges': 'bytes',
     'Access-Control-Allow-Origin': '*',
@@ -72,27 +79,35 @@ async function serveMedia(request) {
 
   const stream = fs.createReadStream(filePath, { start, end });
   stream.on('error', () => {});
-  return new Response(Readable.toWeb(stream), { status, headers });
+  return new Response(Readable.toWeb(stream) as unknown as BodyInit, { status, headers });
 }
 
-function send(channel, payload) {
+function send<K extends keyof ApiEvents>(channel: K, payload?: ApiEvents[K]): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function fail(message: string, code: string): never {
+  throw Object.assign(new Error(message), { code });
+}
+
 // Every handler answers { ok, data } or { ok: false, error } so error codes survive IPC.
-function handle(channel, fn) {
-  ipcMain.handle(channel, async (_event, ...args) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function handle(channel: string, fn: (...args: any[]) => unknown): void {
+  ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
     try {
       return { ok: true, data: await fn(...args) };
     } catch (err) {
-      return { ok: false, error: { code: err.code || 'ERROR', message: err.message, detail: err.detail } };
+      return {
+        ok: false,
+        error: { code: shared.errorCode(err) || 'ERROR', message: shared.errorMessage(err), detail: (err as shared.ClipError).detail },
+      };
     }
   });
 }
 
 const watcher = library.createWatcher(() => send('library:changed'));
 
-async function getKeyframes(filePath, startTime) {
+async function getKeyframes(filePath: string, startTime: number): Promise<number[]> {
   const stat = await fs.promises.stat(filePath);
   const cached = keyframeCache.get(filePath);
   if (cached && cached.mtime === stat.mtimeMs) return cached.times;
@@ -101,53 +116,55 @@ async function getKeyframes(filePath, startTime) {
   return times;
 }
 
-function cachedKeyframes(filePath) {
+function cachedKeyframes(filePath: string): number[] | null {
   const cached = keyframeCache.get(filePath);
   return cached ? cached.times : null;
 }
 
-function initialFile(argv) {
+function initialFile(argv: string[]): string | null {
   return argv.slice(1).find((arg) => !arg.startsWith('-') && shared.isVideoFile(arg) && fs.existsSync(arg)) || null;
 }
 
-function registerIpc() {
+function registerIpc(): void {
   handle('dialog:openFile', async () => {
-    const res = await dialog.showOpenDialog(win, {
+    const options: Electron.OpenDialogOptions = {
       properties: ['openFile'],
       filters: [{ name: 'Video', extensions: shared.VIDEO_EXTS.map((e) => e.slice(1)) }],
-    });
+    };
+    const res = await (win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options));
     return res.canceled ? null : res.filePaths[0];
   });
 
   handle('dialog:openFolder', async () => {
-    const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
+    const options: Electron.OpenDialogOptions = { properties: ['openDirectory'] };
+    const res = await (win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options));
     return res.canceled ? null : res.filePaths[0];
   });
 
-  handle('library:scan', async (roots, hidden) => {
+  handle('library:scan', async (roots: string[], hidden?: string[]) => {
     const trees = await library.scanLibrary(roots, hidden || []);
     watcher.set(roots.filter((root) => fs.existsSync(root)));
     return trees;
   });
 
   handle('library:defaultRoot', () => app.getPath('videos'));
-  handle('fs:move', (src, destDir) => library.moveFile(src, destDir));
-  handle('fs:rename', (src, stem) => library.renameFile(src, stem));
-  handle('fs:restore', (filePath) => library.restoreFile(filePath));
-  handle('fs:trash', async (filePath) => {
+  handle('fs:move', (src: string, destDir: string) => library.moveFile(src, destDir));
+  handle('fs:rename', (src: string, stem: string) => library.renameFile(src, stem));
+  handle('fs:restore', (filePath: string) => library.restoreFile(filePath));
+  handle('fs:trash', async (filePath: string) => {
     library.assertVideo(filePath);
     await shell.trashItem(filePath);
   });
 
-  handle('media:probe', async (filePath) => {
+  handle('media:probe', async (filePath: string): Promise<MediaDoc> => {
     const info = await shared.probe(filePath);
     origins.set(filePath, info.origin);
     return { path: filePath, name: path.basename(filePath), dir: path.dirname(filePath), url: mediaUrl(filePath), info };
   });
 
-  handle('media:keyframes', (filePath, startTime) => getKeyframes(filePath, startTime));
+  handle('media:keyframes', (filePath: string, startTime: number) => getKeyframes(filePath, startTime));
 
-  handle('media:proxy', async (filePath, level, duration) => {
+  handle('media:proxy', async (filePath: string, level: ProxyLevel, duration: number) => {
     if (proxyJob) proxyJob.abort();
     const controller = new AbortController();
     proxyJob = controller;
@@ -179,7 +196,7 @@ function registerIpc() {
   });
 
   // Same decision the export will make, so the UI can show "instant / exact" and the file name up front.
-  handle('export:plan', (input, segments, fps, outputDir) => {
+  handle('export:plan', (input: string, segments: Segment[], fps: number, outputDir: string | null): ExportPlan => {
     const plan = shared.planSegments(segments, cachedKeyframes(input), 'auto', fps);
     const dir = outputDir || path.dirname(input);
     const origin = shared.lineage(origins.get(input), input, plan.segments);
@@ -187,15 +204,16 @@ function registerIpc() {
     return { mode: plan.mode, name: path.basename(output), dir };
   });
 
-  handle('export:start', async ({ input, segments, outputDir, name }) => {
+  handle('export:start', async ({ input, segments, outputDir, name }: ExportJob) => {
     // A name chosen in the dialog keeps the .mp4 extension and never replaces an existing file.
-    let output;
+    let output: string | undefined;
     if (name) {
-      if (/[\\/:*?"<>|]/.test(name) || name.endsWith('.')) throw Object.assign(new Error('That name is not allowed.'), { code: 'BAD_NAME' });
+      if (/[\\/:*?"<>|]/.test(name) || name.endsWith('.')) fail('That name is not allowed.', 'BAD_NAME');
       output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}.mp4`));
     }
-    if (exportJob) throw Object.assign(new Error('An export is already running.'), { code: 'BUSY' });
-    exportJob = new AbortController();
+    if (exportJob) fail('An export is already running.', 'BUSY');
+    const job = new AbortController();
+    exportJob = job;
     try {
       return await shared.clip({
         input,
@@ -204,7 +222,7 @@ function registerIpc() {
         outputDir: outputDir || undefined,
         mode: 'auto',
         keyframes: cachedKeyframes(input) || undefined,
-        signal: exportJob.signal,
+        signal: job.signal,
         onProgress: (p) => send('export:progress', p),
       });
     } finally {
@@ -216,9 +234,9 @@ function registerIpc() {
     if (exportJob) exportJob.abort();
   });
 
-  handle('shell:show', (filePath) => shell.showItemInFolder(filePath));
+  handle('shell:show', (filePath: string) => shell.showItemInFolder(filePath));
 
-  handle('window:theme', (theme) => {
+  handle('window:theme', (theme: Theme) => {
     const colors = TITLEBAR[theme] || TITLEBAR.dark;
     if (!win || win.isDestroyed()) return;
     win.setBackgroundColor(colors.background);
@@ -230,15 +248,15 @@ function registerIpc() {
   handle('app:initialFile', () => initialFile(process.argv));
 }
 
-function createWindow() {
-  win = new BrowserWindow({
+function createWindow(): void {
+  const created = new BrowserWindow({
     width: 1320,
     height: 800,
     minWidth: 960,
     minHeight: 600,
     show: false,
     title: 'Clip Goat',
-    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    icon: path.join(ROOT, 'assets', 'icon.png'),
     backgroundColor: TITLEBAR.dark.background,
     titleBarStyle: 'hidden',
     titleBarOverlay:
@@ -249,21 +267,22 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  win = created;
 
-  win.once('ready-to-show', () => win.show());
-  win.on('closed', () => {
+  created.once('ready-to-show', () => created.show());
+  created.on('closed', () => {
     win = null;
   });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  created.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  created.webContents.on('will-navigate', (event) => event.preventDefault());
 
   if (DEV_URL) {
-    win.loadURL(DEV_URL);
-    win.webContents.on('before-input-event', (_event, input) => {
-      if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
+    void created.loadURL(DEV_URL);
+    created.webContents.on('before-input-event', (_event, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') created.webContents.toggleDevTools();
     });
   } else {
-    win.loadFile(path.join(__dirname, '..', 'renderer', 'dist', 'index.html'));
+    void created.loadFile(path.join(ROOT, 'renderer', 'dist', 'index.html'));
   }
 }
 
@@ -278,7 +297,7 @@ if (!app.requestSingleInstanceLock()) {
     if (file) send('app:open-file', file);
   });
 
-  app.whenReady().then(() => {
+  void app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     protocol.handle('media', serveMedia);
     registerIpc();

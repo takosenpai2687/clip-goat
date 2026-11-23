@@ -1,7 +1,8 @@
-import { memo, useState } from 'react';
+import { memo, useState, type MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, CornerDownLeft, Crosshair, FolderInput, Trash2, X, Zap } from 'lucide-react';
-import Menu from './Menu';
+import Menu, { type MenuState } from './Menu';
+import type { ClipResult, ExportMode, ExportPlan, Segment } from '../../../shared/types';
 import { formatLength, formatTime } from '../lib/format';
 import { useT } from '../lib/i18n';
 
@@ -12,18 +13,42 @@ const swap = {
   transition: { duration: 0.16 },
 };
 
-const baseName = (dir) => (dir || '').split(/[\\/]/).filter(Boolean).pop() || '';
+const baseName = (dir: string | null | undefined): string => (dir || '').split(/[\\/]/).filter(Boolean).pop() || '';
 
-function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss, onDeleteSource }) {
+/** Where an export stands, from idle through progress to its result. */
+export type ExportState =
+  | { status: 'idle'; percent: number }
+  | { status: 'running'; percent: number; mode: ExportMode }
+  | { status: 'done'; percent: number; result: ClipResult }
+  | { status: 'error'; percent: number; message: string };
+
+interface ExportBarProps {
+  segments: Segment[];
+  length: number;
+  plan: ExportPlan;
+  canSnap: boolean;
+  onSnap: () => void;
+  dest: string | null;
+  onDest: (dir: string | null) => void;
+  onChooseDest: () => void;
+  state: ExportState;
+  onExport: () => void;
+  onCancel: () => void;
+  onShow: () => void;
+  onDismiss: () => void;
+  onDeleteSource: () => void;
+}
+
+function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss, onDeleteSource }: ExportBarProps) {
   const t = useT();
-  const [menu, setMenu] = useState(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
   const figure = formatLength(length);
   const first = segments[0];
   const last = segments[segments.length - 1];
   const running = state.status === 'running';
   const idle = state.status !== 'done' && !running;
 
-  const openDestMenu = (event) => {
+  const openDestMenu = (event: MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({
       x: rect.left,

@@ -3,12 +3,28 @@ import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 
 // A small floating menu at a screen position. Items: { label, onSelect, confirm?, danger?, checked? }.
-export default function Menu({ x, y, items, onClose }) {
-  const ref = useRef(null);
+export interface MenuItem {
+  label: string;
+  onSelect: () => void;
+  /** Shown after the first click; a second click then runs the item. */
+  confirm?: string;
+  danger?: boolean;
+  checked?: boolean;
+}
+
+export interface MenuState {
+  x: number;
+  y: number;
+  items: MenuItem[];
+}
+
+export default function Menu({ x, y, items, onClose }: MenuState & { onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
-  const [armed, setArmed] = useState(null);
+  const [armed, setArmed] = useState<number | null>(null);
 
   useLayoutEffect(() => {
+    if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     setPos({
       left: Math.max(8, Math.min(x, window.innerWidth - rect.width - 8)),
@@ -17,10 +33,10 @@ export default function Menu({ x, y, items, onClose }) {
   }, [x, y]);
 
   useEffect(() => {
-    const onDown = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) onClose();
+    const onDown = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose();
     };
-    const onKey = (event) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
         onClose();

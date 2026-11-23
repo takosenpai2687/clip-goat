@@ -1,16 +1,21 @@
-'use strict';
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
+import type { ApiEvents, ClipGoatApi } from '../shared/types';
 
-const { contextBridge, ipcRenderer, webUtils } = require('electron');
+const EVENTS: (keyof ApiEvents)[] = ['export:progress', 'media:proxy-progress', 'library:changed', 'app:open-file'];
 
-const EVENTS = ['export:progress', 'media:proxy-progress', 'library:changed', 'app:open-file'];
+interface Reply<T> {
+  ok: boolean;
+  data: T;
+  error: { code: string; message: string; detail?: string };
+}
 
-async function call(channel, ...args) {
-  const res = await ipcRenderer.invoke(channel, ...args);
+async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const res = (await ipcRenderer.invoke(channel, ...args)) as Reply<T>;
   if (res.ok) return res.data;
   throw Object.assign(new Error(res.error.message), res.error);
 }
 
-contextBridge.exposeInMainWorld('clipgoat', {
+const api: ClipGoatApi = {
   platform: process.platform,
   pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: () => call('dialog:openFile'),
@@ -33,8 +38,10 @@ contextBridge.exposeInMainWorld('clipgoat', {
   initialFile: () => call('app:initialFile'),
   on(channel, listener) {
     if (!EVENTS.includes(channel)) return () => {};
-    const wrapped = (_event, payload) => listener(payload);
+    const wrapped = (_event: IpcRendererEvent, payload: unknown) => listener(payload as never);
     ipcRenderer.on(channel, wrapped);
     return () => ipcRenderer.removeListener(channel, wrapped);
   },
-});
+};
+
+contextBridge.exposeInMainWorld('clipgoat', api);

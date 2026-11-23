@@ -1,25 +1,56 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronRight, Ellipsis, FolderPlus, Scissors, Search, X } from 'lucide-react';
-import Menu from './Menu';
+import Menu, { type MenuItem, type MenuState } from './Menu';
 import { formatDay, formatSize } from '../lib/format';
-import { useT } from '../lib/i18n';
+import { useT, type Lang } from '../lib/i18n';
+import type { LibraryDir, LibraryFile } from '../../../shared/types';
 
-const FILTERS = ['all', 'originals', 'clips'];
+export type Filter = 'all' | 'originals' | 'clips';
+
+interface DirRow {
+  type: 'dir';
+  node: LibraryDir;
+  depth: number;
+  isRoot: boolean;
+  /** Videos under this folder that pass the current filter. */
+  count: number;
+  open: boolean;
+}
+
+interface FileRow {
+  type: 'file';
+  file: LibraryFile;
+  /** Listed under another video of the same source, joined to it by a branch line. */
+  child: boolean;
+  last?: boolean;
+  depth: number;
+  shown: string;
+}
+
+type Row = DirRow | FileRow;
+
+interface GroupedFile {
+  file: LibraryFile;
+  child: boolean;
+  last?: boolean;
+}
+
+const FILTERS: Filter[] = ['all', 'originals', 'clips'];
 const DRAG_TYPE = 'application/x-clipgoat-path';
 
 // Turns the folder trees into the list of rows currently on screen.
 // While filtering or searching, folders with no match are hidden and matching folders open themselves.
-function flatten(trees, expanded, filter, query) {
+function flatten(trees: LibraryDir[], expanded: Set<string>, filter: Filter, query: string): Row[] {
   const q = query.trim().toLowerCase();
   const narrowed = filter !== 'all' || q !== '';
-  const matches = (f) => (filter === 'all' || (filter === 'clips') === f.clipped) && (!q || f.name.toLowerCase().includes(q));
-  const rows = [];
+  const matches = (f: LibraryFile): boolean => (filter === 'all' || (filter === 'clips') === f.clipped) && (!q || f.name.toLowerCase().includes(q));
+  const rows: Row[] = [];
 
-  const visit = (node, depth, isRoot, ancestors = []) => {
+  const visit = (node: LibraryDir, depth: number, isRoot: boolean, ancestors: string[] = []): number => {
     const names = [node.name, ...ancestors];
     const files = node.files.filter(matches);
-    const row = { type: 'dir', node, depth, isRoot, count: files.length, open: q ? true : expanded.has(node.path) };
+    const row: DirRow = { type: 'dir', node, depth, isRoot, count: files.length, open: q ? true : expanded.has(node.path) };
     const at = rows.push(row) - 1;
     const childStart = rows.length;
     for (const dir of node.dirs) row.count += visit(dir, depth + 1, false, names);
@@ -39,7 +70,7 @@ function flatten(trees, expanded, filter, query) {
 }
 
 // "Game 2026.11.22.mp4" inside a "Game" folder is shown as "2026.11.22.mp4": the folder already says the rest.
-function shortName(name, ancestors) {
+function shortName(name: string, ancestors: string[]): string {
   for (const folder of ancestors) {
     if (name.length > folder.length + 1 && name.toLowerCase().startsWith(folder.toLowerCase()) && /[\s_-]/.test(name[folder.length])) {
       return name.slice(folder.length).replace(/^[\s_-]+/, '');
@@ -49,7 +80,7 @@ function shortName(name, ancestors) {
 }
 
 // Long names keep both ends: the start says what it is, the end usually holds the time.
-function MidName({ text, className }) {
+function MidName({ text, className }: { text: string; className?: string }) {
   const cut = text.length > 18 ? text.length - 12 : text.length;
   return (
     <span className={`mid ${className || ''}`}>
@@ -62,16 +93,17 @@ function MidName({ text, className }) {
 // Puts each clip right under the original it was cut from. When the original is gone, its clips stay
 // together with the first one as the head of the group. Groups are ordered newest first, so clips never
 // sink to the bottom of the folder when their original is deleted.
-function grouped(files) {
-  const stem = (f) => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
-  const byHead = new Map();
+function grouped(files: LibraryFile[]): GroupedFile[] {
+  const stem = (f: LibraryFile): string => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
+  const byHead = new Map<string, LibraryFile[]>();
   for (const f of files) {
     if (!f.clipped) continue;
     const key = f.label.head.toLowerCase();
-    if (!byHead.has(key)) byHead.set(key, []);
-    byHead.get(key).push(f);
+    const list = byHead.get(key);
+    if (list) list.push(f);
+    else byHead.set(key, [f]);
   }
-  const groups = [];
+  const groups: { at: number; rows: GroupedFile[] }[] = [];
   for (const f of files) {
     if (f.clipped) continue;
     const clips = byHead.get(stem(f)) || [];
@@ -90,15 +122,39 @@ function grouped(files) {
   return groups.sort((a, b) => b.at - a.at).flatMap((group) => group.rows);
 }
 
-function tally(trees) {
+function tally(trees: LibraryDir[]): { originals: number; clips: number } {
   let originals = 0;
   let clips = 0;
-  const walk = (node) => {
-    for (const f of node.files) f.clipped ? clips++ : originals++;
+  const walk = (node: LibraryDir): void => {
+    for (const f of node.files) {
+      if (f.clipped) clips++;
+      else originals++;
+    }
     node.dirs.forEach(walk);
   };
   trees.forEach(walk);
   return { originals, clips };
+}
+
+interface LibraryProps {
+  trees: LibraryDir[];
+  expanded: Set<string>;
+  onToggle: (dir: string) => void;
+  filter: Filter;
+  onFilter: (filter: Filter) => void;
+  currentPath: string | null;
+  destPath: string | null;
+  onOpen: (filePath: string) => void;
+  onAddRoot: () => void;
+  onRemoveRoot: (dir: string) => void;
+  onHideDir: (dir: string) => void;
+  onMove: (src: string, destDir: string) => void;
+  onRename: (filePath: string, stem: string) => void;
+  onTrash: (filePath: string) => void;
+  onShow: (target: string) => void;
+  onSetDest: (dir: string) => void;
+  notice: string;
+  lang: Lang;
 }
 
 function Library({
@@ -120,17 +176,17 @@ function Library({
   onSetDest,
   notice,
   lang,
-}) {
+}: LibraryProps) {
   const t = useT();
   const [query, setQuery] = useState('');
-  const [menu, setMenu] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [dropTarget, setDropTarget] = useState(null);
-  const currentRow = useRef(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const currentRow = useRef<HTMLDivElement>(null);
 
   const rows = useMemo(() => flatten(trees, expanded, filter, query), [trees, expanded, filter, query]);
   const counts = useMemo(() => tally(trees), [trees]);
-  const labels = { all: t.filterAll, originals: t.filterOriginals, clips: t.filterClips };
+  const labels: Record<Filter, string> = { all: t.filterAll, originals: t.filterOriginals, clips: t.filterClips };
   const currentShown = rows.some((r) => r.type === 'file' && r.file.path === currentPath);
 
   useEffect(() => {
@@ -140,7 +196,7 @@ function Library({
     return () => clearTimeout(timer);
   }, [currentPath, currentShown]);
 
-  const openMenu = (event, items) => {
+  const openMenu = (event: MouseEvent<HTMLElement>, items: MenuItem[]) => {
     event.preventDefault();
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
@@ -148,31 +204,31 @@ function Library({
     setMenu({ x: fromButton ? rect.left : event.clientX, y: fromButton ? rect.bottom + 4 : event.clientY, items });
   };
 
-  const fileItems = (file) => [
+  const fileItems = (file: LibraryFile): MenuItem[] => [
     { label: t.rename, onSelect: () => setEditing(file.path) },
     { label: t.reveal, onSelect: () => onShow(file.path) },
     { label: t.trash, confirm: t.trashConfirm, danger: true, onSelect: () => onTrash(file.path) },
   ];
-  const dirItems = (row) => [
+  const dirItems = (row: DirRow): MenuItem[] => [
     { label: t.exportHere, checked: destPath === row.node.path, onSelect: () => onSetDest(row.node.path) },
     { label: t.reveal, onSelect: () => onShow(row.node.path) },
     { label: t.removeRoot, onSelect: () => (row.isRoot ? onRemoveRoot(row.node.path) : onHideDir(row.node.path)) },
   ];
 
-  const commitRename = (file, value) => {
+  const commitRename = (file: LibraryFile, value: string) => {
     setEditing(null);
     const stem = value.trim();
     const ext = file.name.slice(file.name.lastIndexOf('.'));
     if (stem && stem + ext !== file.name) onRename(file.path, stem);
   };
 
-  const dragOver = (event, dir) => {
+  const dragOver = (event: DragEvent, dir: string) => {
     if (!Array.from(event.dataTransfer.types).includes(DRAG_TYPE)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     if (dropTarget !== dir) setDropTarget(dir);
   };
-  const drop = (event, dir) => {
+  const drop = (event: DragEvent, dir: string) => {
     const src = event.dataTransfer.getData(DRAG_TYPE);
     setDropTarget(null);
     if (!src) return;
@@ -210,7 +266,7 @@ function Library({
         ))}
       </div>
 
-      <div className="tree" role="tree" onDragLeave={(event) => !event.currentTarget.contains(event.relatedTarget) && setDropTarget(null)}>
+      <div className="tree" role="tree" onDragLeave={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && setDropTarget(null)}>
         {trees.length === 0 && <p className="empty-note">{t.emptyLibrary}</p>}
 
         {rows.map((row) => {
@@ -245,6 +301,7 @@ function Library({
           }
 
           const { file } = row;
+          const clipCount = file.clips ?? 0;
           const current = file.path === currentPath;
           if (editing === file.path) {
             return (
@@ -260,7 +317,7 @@ function Library({
                   onBlur={() => setEditing(null)}
                   onKeyDown={(event) => {
                     event.stopPropagation();
-                    if (event.key === 'Enter') commitRename(file, event.target.value);
+                    if (event.key === 'Enter') commitRename(file, event.currentTarget.value);
                     if (event.key === 'Escape') setEditing(null);
                   }}
                 />
@@ -271,7 +328,7 @@ function Library({
             <div
               key={file.path}
               ref={current ? currentRow : undefined}
-              className={`tree-row is-file${file.clipped ? ' is-clip' : ''}${file.clips > 0 ? ' is-done' : ''}${current ? ' is-current' : ''}`}
+              className={`tree-row is-file${file.clipped ? ' is-clip' : ''}${clipCount > 0 ? ' is-done' : ''}${current ? ' is-current' : ''}`}
               style={indent}
               draggable
               onDragStart={(event) => {
@@ -299,10 +356,10 @@ function Library({
                 </span>
                 <MidName text={row.shown} className="file-head" />
               </button>
-              {file.clips > 0 && (
-                <span className="clip-badge num" title={t.clipCount(file.clips)} aria-label={t.clipCount(file.clips)}>
+              {clipCount > 0 && (
+                <span className="clip-badge num" title={t.clipCount(clipCount)} aria-label={t.clipCount(clipCount)}>
                   <Scissors size={12} strokeWidth={2} aria-hidden="true" />
-                  {file.clips}
+                  {clipCount}
                 </span>
               )}
               <button type="button" className="row-more" aria-label={t.more} title={t.more} onClick={(event) => openMenu(event, fileItems(file))}>

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-'use strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseArgs } from 'node:util';
+import { clip, errorCode, errorMessage, type ClipError, type Segment } from '../shared';
 
-const { parseArgs } = require('node:util');
-const { clip } = require('../shared');
-const pkg = require('../package.json');
+// Compiled to dist/cli, so the package manifest sits two folders up.
+const { version } = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8')) as { version: string };
 
-const HELP = `clip-goat ${pkg.version} - cut a range out of a video
+const HELP = `clip-goat ${version} - cut a range out of a video
 
 Usage:
   clip-goat --input <file> --start <sec> --end <sec> [options]
@@ -30,12 +32,12 @@ If stream copy fails, it falls back to re-encoding automatically.
 
 Exit codes: 0 success, 1 export failed, 2 bad arguments.`;
 
-function fail(message, code) {
+function fail(message: string, code: number): never {
   process.stderr.write(`clip-goat: ${message}\n`);
   process.exit(code);
 }
 
-function parseSeconds(value, name) {
+function parseSeconds(value: string | undefined, name: string): number {
   const n = Number(value);
   if (value === undefined || value === '' || !Number.isFinite(n)) {
     fail(`--${name} must be a number of seconds, got "${value}"`, 2);
@@ -43,7 +45,7 @@ function parseSeconds(value, name) {
   return n;
 }
 
-function parseSegments(list) {
+function parseSegments(list: string): Segment[] {
   return list.split(',').map((item) => {
     const m = /^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/.exec(item);
     if (!m) fail(`--segments expects start-end,start-end (got "${item}")`, 2);
@@ -51,10 +53,9 @@ function parseSegments(list) {
   });
 }
 
-async function main() {
-  let values;
+function readArgs() {
   try {
-    ({ values } = parseArgs({
+    return parseArgs({
       options: {
         input: { type: 'string', short: 'i' },
         start: { type: 'string', short: 's' },
@@ -69,19 +70,29 @@ async function main() {
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
-    }));
+    }).values;
   } catch (err) {
-    fail(`${err.message}\nRun "clip-goat --help" for usage.`, 2);
+    return fail(`${errorMessage(err)}\nRun "clip-goat --help" for usage.`, 2);
   }
+}
 
-  if (values.help) return process.stdout.write(`${HELP}\n`);
-  if (values.version) return process.stdout.write(`${pkg.version}\n`);
+async function main(): Promise<void> {
+  const values = readArgs();
+
+  if (values.help) {
+    process.stdout.write(`${HELP}\n`);
+    return;
+  }
+  if (values.version) {
+    process.stdout.write(`${version}\n`);
+    return;
+  }
 
   if (!values.input) fail('--input is required. Run "clip-goat --help" for usage.', 2);
   if (values.fast && values['force-encode']) fail('--fast and --force-encode cannot be combined.', 2);
   if (values.output && values['out-dir']) fail('Use either --output or --out-dir.', 2);
 
-  let segments;
+  let segments: Segment[];
   if (values.segments) {
     if (values.start !== undefined || values.end !== undefined) fail('Use either --segments or --start/--end.', 2);
     segments = parseSegments(values.segments);
@@ -107,10 +118,12 @@ async function main() {
     process.stdout.write(values.json ? `${JSON.stringify(result)}\n` : `${result.output}\n`);
   } catch (err) {
     if (showProgress) process.stderr.write('\n');
-    const badArgs = ['BAD_RANGE', 'BAD_INPUT', 'BAD_OUTPUT_PATH', 'NOT_FOUND', 'EXISTS'].includes(err.code);
-    const hint = err.code === 'EXISTS' ? ' (use --overwrite to replace it)' : '';
-    fail(err.detail ? `${err.message}\n${err.detail}` : `${err.message}${hint}`, badArgs ? 2 : 1);
+    const code = errorCode(err) || '';
+    const badArgs = ['BAD_RANGE', 'BAD_INPUT', 'BAD_OUTPUT_PATH', 'NOT_FOUND', 'EXISTS'].includes(code);
+    const hint = code === 'EXISTS' ? ' (use --overwrite to replace it)' : '';
+    const detail = (err as ClipError).detail;
+    fail(detail ? `${errorMessage(err)}\n${detail}` : `${errorMessage(err)}${hint}`, badArgs ? 2 : 1);
   }
 }
 
-main();
+void main();

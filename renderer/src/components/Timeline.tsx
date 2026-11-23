@@ -1,13 +1,37 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Filmstrip } from '../lib/filmstrip';
 import { clamp, formatTime } from '../lib/format';
-import { nearestKeyframe } from '../lib/segments';
+import { nearestKeyframe, type Edge, type Range } from '../lib/segments';
+import type { Segment } from '../../../shared/types';
 import { useT } from '../lib/i18n';
 
 const PAD = 12;
 const TRACK_HEIGHT = 64;
 const SNAP_PX = 8;
+
+interface TimelineProps {
+  src: string | null;
+  duration: number;
+  fps: number;
+  aspect: number;
+  /** The part of the video the track currently shows. */
+  view: Segment;
+  onView: (view: Segment) => void;
+  segments: Range[];
+  activeId: number | null;
+  onActivate: (id: number) => void;
+  onEdge: (id: number, edge: Edge, time: number) => void;
+  currentTime: number;
+  onSeek: (time: number) => void;
+  keyframes: number[] | null;
+}
+
+interface Tile {
+  x: number;
+  w: number;
+  time: number;
+}
 
 export default function Timeline({
   src,
@@ -23,23 +47,23 @@ export default function Timeline({
   currentTime,
   onSeek,
   keyframes,
-}) {
+}: TimelineProps) {
   const t = useT();
-  const shellRef = useRef(null);
-  const canvasRef = useRef(null);
-  const filmRef = useRef(null);
-  const dragRef = useRef(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const filmRef = useRef<Filmstrip | null>(null);
+  const dragRef = useRef<{ id: number; edge: Edge; offset: number } | null>(null);
   const [width, setWidth] = useState(0);
   const [tick, setTick] = useState(0);
-  const [drag, setDrag] = useState(null);
+  const [drag, setDrag] = useState<{ id: number; edge: Edge; snapped: boolean } | null>(null);
 
   const span = view.end - view.start;
   const pps = width > 0 ? width / span : 0;
-  const xOf = (time) => (time - view.start) * pps;
+  const xOf = (time: number): number => (time - view.start) * pps;
 
   const timeAt = useCallback(
-    (clientX) => {
-      const rect = shellRef.current.getBoundingClientRect();
+    (clientX: number): number => {
+      const rect = (shellRef.current as HTMLDivElement).getBoundingClientRect();
       return view.start + ((clientX - rect.left - PAD) / Math.max(1, rect.width - PAD * 2)) * (view.end - view.start);
     },
     [view],
@@ -47,6 +71,7 @@ export default function Timeline({
 
   useLayoutEffect(() => {
     const el = shellRef.current;
+    if (!el) return undefined;
     const observer = new ResizeObserver(() => setWidth(Math.max(0, el.clientWidth - PAD * 2)));
     observer.observe(el);
     return () => observer.disconnect();
@@ -63,12 +88,12 @@ export default function Timeline({
   }, [src]);
 
   // Tiles sit on a time grid that halves with each zoom level, so panning reuses captured frames.
-  const tiles = useCallback(() => {
+  const tiles = useCallback((): Tile[] => {
     if (!width || !duration) return [];
     const baseSlots = Math.max(1, Math.round(width / (TRACK_HEIGHT * (aspect || 16 / 9))));
     const level = Math.max(0, Math.round(Math.log2(duration / span)));
     const step = duration / baseSlots / 2 ** level;
-    const out = [];
+    const out: Tile[] = [];
     for (let k = Math.floor(view.start / step); k * step < view.end; k++) {
       out.push({ x: xOf(k * step), w: step * pps, time: Math.min(Math.max(0, duration - 0.05), k * step + step / 2) });
     }
@@ -77,7 +102,7 @@ export default function Timeline({
 
   useEffect(() => {
     if (!src) return undefined;
-    const timer = setTimeout(() => filmRef.current.request(tiles().map((tile) => tile.time)), 80);
+    const timer = setTimeout(() => filmRef.current?.request(tiles().map((tile) => tile.time)), 80);
     return () => clearTimeout(timer);
   }, [src, tiles]);
 
@@ -88,14 +113,16 @@ export default function Timeline({
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(TRACK_HEIGHT * dpr);
     const ctx = canvas.getContext('2d');
+    const film = filmRef.current;
+    if (!ctx || !film) return undefined;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, TRACK_HEIGHT);
 
     const now = performance.now();
     let fading = false;
     for (const tile of tiles()) {
-      const exact = filmRef.current.get(tile.time);
-      const entry = exact || filmRef.current.nearest(tile.time);
+      const exact = film.get(tile.time);
+      const entry = exact || film.nearest(tile.time);
       if (!entry) continue;
       const alpha = exact ? clamp((now - exact.at) / 220, 0, 1) : 0.45;
       if (exact && alpha < 1) fading = true;
@@ -125,7 +152,8 @@ export default function Timeline({
 
   useEffect(() => {
     const el = shellRef.current;
-    const onWheel = (event) => {
+    if (!el) return undefined;
+    const onWheel = (event: WheelEvent) => {
       if (!duration) return;
       event.preventDefault();
       const minSpan = Math.min(duration, Math.max(1, 30 / (fps || 30)));
@@ -144,9 +172,9 @@ export default function Timeline({
     return () => el.removeEventListener('wheel', onWheel);
   }, [duration, fps, width, span, view, onView, timeAt]);
 
-  const frame = (time) => (fps > 0 ? Math.round(time * fps) / fps : time);
+  const frame = (time: number): number => (fps > 0 ? Math.round(time * fps) / fps : time);
 
-  const startHandleDrag = (event, seg, edge) => {
+  const startHandleDrag = (event: PointerEvent<HTMLElement>, seg: Range, edge: Edge) => {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     onActivate(seg.id);
@@ -154,7 +182,7 @@ export default function Timeline({
     setDrag({ id: seg.id, edge, snapped: false });
   };
 
-  const moveHandle = (event) => {
+  const moveHandle = (event: PointerEvent<HTMLElement>) => {
     const d = dragRef.current;
     if (!d) return;
     let time = clamp(timeAt(event.clientX) - d.offset, 0, duration);
@@ -176,7 +204,7 @@ export default function Timeline({
     setDrag(null);
   };
 
-  const nudge = (event, seg, edge) => {
+  const nudge = (event: KeyboardEvent<HTMLElement>, seg: Range, edge: Edge) => {
     const step = (event.shiftKey ? 1 : 1 / (fps || 30)) * (event.key === 'ArrowLeft' ? -1 : 1);
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
@@ -185,7 +213,7 @@ export default function Timeline({
     onEdge(seg.id, edge, clamp(seg[edge] + step, 0, duration));
   };
 
-  const scrub = (event) => {
+  const scrub = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const time = clamp(timeAt(event.clientX), 0, duration);
@@ -194,25 +222,25 @@ export default function Timeline({
     onSeek(time);
   };
 
-  const scrubMove = (event) => {
+  const scrubMove = (event: PointerEvent<HTMLElement>) => {
     if (dragRef.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     onSeek(clamp(timeAt(event.clientX), 0, duration));
   };
 
   // Pan by dragging the overview thumb.
-  const panRef = useRef(null);
-  const startPan = (event) => {
+  const panRef = useRef<{ x: number; start: number; width: number } | null>(null);
+  const startPan = (event: PointerEvent<HTMLElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    panRef.current = { x: event.clientX, start: view.start, width: event.currentTarget.parentElement.clientWidth };
+    panRef.current = { x: event.clientX, start: view.start, width: (event.currentTarget.parentElement as HTMLElement).clientWidth };
   };
-  const movePan = (event) => {
+  const movePan = (event: PointerEvent<HTMLElement>) => {
     const p = panRef.current;
     if (!p) return;
     const start = clamp(p.start + ((event.clientX - p.x) / p.width) * duration, 0, duration - span);
     onView({ start, end: start + span });
   };
 
-  const gaps = [];
+  const gaps: [number, number][] = [];
   let cursor = view.start;
   for (const seg of segments) {
     if (seg.start > cursor) gaps.push([cursor, Math.min(seg.start, view.end)]);
@@ -267,7 +295,7 @@ export default function Timeline({
                 className={`range${active ? ' is-active' : ''}`}
                 style={{ left: xOf(seg.start), width: Math.max(0, xOf(seg.end) - xOf(seg.start)) }}
               >
-                {['start', 'end'].map((edge) => (
+                {(['start', 'end'] as const).map((edge) => (
                   <motion.button
                     key={edge}
                     type="button"

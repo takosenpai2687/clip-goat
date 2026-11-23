@@ -3,98 +3,148 @@ import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Maximize2, Pause, Play, Plus, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import TitleBar from './components/TitleBar';
-import Library from './components/Library';
+import Library, { type Filter } from './components/Library';
 import Backdrop from './components/Backdrop';
 import NameDialog from './components/NameDialog';
 import StageControls, { RATE_CHOICES, SKIP_CHOICES } from './components/StageControls';
 import Timeline from './components/Timeline';
-import ExportBar from './components/ExportBar';
-import { I18nContext, STRINGS, defaultLang, errorText } from './lib/i18n';
+import ExportBar, { type ExportState } from './components/ExportBar';
+import { I18nContext, STRINGS, defaultLang, errorText, type Lang, type Strings } from './lib/i18n';
 import { clamp, formatTime } from './lib/format';
-import { addAt, makeSegment, moveEdge, snapStarts, totalLength } from './lib/segments';
+import { addAt, makeSegment, moveEdge, snapStarts, totalLength, type Edge, type Range } from './lib/segments';
+import type { ExportPlan, LibraryDir, MediaDoc, ProxyLevel, Segment, Theme } from '../../shared/types';
+
+/** How the preview is fed: the file itself, or a proxy built from it. */
+type Level = 'direct' | ProxyLevel;
+
+interface LoadState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  percent?: number;
+  message?: string;
+}
+
+interface Naming {
+  stem: string;
+  dir: string;
+}
+
+interface Toast {
+  text: string;
+  canUndo: boolean;
+  id: number;
+}
+
+/** A delete or rename that Ctrl+Z can take back. */
+type UndoEntry = { type: 'rename'; from: string; to: string } | { type: 'trash'; path: string; wasOpen?: boolean };
+
+interface FileOpResult {
+  ok: boolean;
+  next?: string | null;
+  wasOpen?: boolean;
+}
+
+/** The latest state, readable from callbacks without re-creating them. */
+interface Live {
+  doc: MediaDoc | null;
+  naming: Naming | null;
+  skip: number;
+  roots: string[] | null;
+  tempRoots: string[];
+  hidden: string[];
+  dest: string | null;
+  segments: Range[];
+  activeId: number | null;
+  view: Segment;
+  time: number;
+  load: LoadState;
+  exp: ExportState;
+  plan: ExportPlan;
+  t: Strings;
+}
 
 const api = window.clipgoat;
 const PLAYABLE_CODECS = ['h264', 'hevc', 'vp8', 'vp9', 'av1'];
 const PLAYABLE_EXTS = ['mp4', 'm4v', 'mov', 'webm', 'mkv'];
-const IDLE = { status: 'idle', percent: 0 };
+const IDLE: ExportState = { status: 'idle', percent: 0 };
 
-const stored = (key, fallback) => localStorage.getItem(key) ?? fallback;
-const storedJson = (key, fallback) => {
+const stored = (key: string, fallback: string): string => localStorage.getItem(key) ?? fallback;
+const storedJson = <T,>(key: string, fallback: T): T => {
   try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+    return (JSON.parse(localStorage.getItem(key) ?? 'null') as T | null) ?? fallback;
   } catch {
     return fallback;
   }
 };
-const samePath = (a, b) => a.toLowerCase() === b.toLowerCase();
-const baseName = (p) => p.split(/[\\/]/).pop();
-const isInside = (dir, root) => samePath(dir, root) || dir.toLowerCase().startsWith(root.toLowerCase().replace(/[\\/]+$/, '') + (root.includes('/') ? '/' : '\\'));
-const allRoots = (roots, tempRoots) => [...(roots || []), ...tempRoots.filter((p) => !(roots || []).some((r) => samePath(r, p)))];
-const extOf = (name) => name.split('.').pop().toLowerCase();
+const codeOf = (err: unknown): string | undefined => (err as { code?: string } | null)?.code;
+const samePath = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+const baseName = (p: string): string => p.split(/[\\/]/).pop() ?? p;
+const isInside = (dir: string, root: string): boolean => samePath(dir, root) || dir.toLowerCase().startsWith(root.toLowerCase().replace(/[\\/]+$/, '') + (root.includes('/') ? '/' : '\\'));
+const allRoots = (roots: string[] | null, tempRoots: string[]): string[] => [...(roots || []), ...tempRoots.filter((p) => !(roots || []).some((r) => samePath(r, p)))];
+const extOf = (name: string): string => (name.split('.').pop() ?? '').toLowerCase();
 
 // How to feed the <video> tag: the file itself, a remuxed MP4, or a transcoded proxy.
-function firstLevel(doc) {
+function firstLevel(doc: MediaDoc): Level {
   if (!PLAYABLE_CODECS.includes(doc.info.video.codec)) return 'transcode';
   return PLAYABLE_EXTS.includes(extOf(doc.name)) ? 'direct' : 'remux';
 }
 
-function nextLevel(doc, level) {
+function nextLevel(doc: MediaDoc, level: Level): ProxyLevel | null {
   if (level === 'direct') return ['mp4', 'm4v', 'mov'].includes(extOf(doc.name)) ? 'transcode' : 'remux';
   return level === 'remux' ? 'transcode' : null;
 }
 
 export default function App() {
-  const [lang, setLang] = useState(() => stored('lang', defaultLang()));
-  const [theme, setTheme] = useState(() => stored('theme', 'dark'));
+  const [lang, setLang] = useState<Lang>(() => (stored('lang', defaultLang()) === 'zh' ? 'zh' : 'en'));
+  const [theme, setTheme] = useState<Theme>(() => (stored('theme', 'dark') === 'light' ? 'light' : 'dark'));
   const [sidebarOpen, setSidebarOpen] = useState(() => stored('sidebar', '1') === '1');
   // roots is null until the first run has picked the system Videos folder.
-  const [roots, setRoots] = useState(() => storedJson('roots', null));
-  const [tempRoots, setTempRoots] = useState([]);
-  const [trees, setTrees] = useState([]);
-  const [expanded, setExpanded] = useState(() => new Set(storedJson('expanded', [])));
-  const [filter, setFilter] = useState('all');
+  const [roots, setRoots] = useState<string[] | null>(() => storedJson<string[] | null>('roots', null));
+  const [tempRoots, setTempRoots] = useState<string[]>([]);
+  const [trees, setTrees] = useState<LibraryDir[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(storedJson<string[]>('expanded', [])));
+  const [filter, setFilter] = useState<Filter>('all');
   // Subfolders the user removed from the library; they are skipped until added back.
-  const [hidden, setHidden] = useState(() => storedJson('hidden', []));
-  const [dest, setDest] = useState(() => stored('dest', '') || null);
+  const [hidden, setHidden] = useState<string[]>(() => storedJson<string[]>('hidden', []));
+  const [dest, setDest] = useState<string | null>(() => stored('dest', '') || null);
   const [notice, setNotice] = useState('');
 
-  const [doc, setDoc] = useState(null);
-  const [load, setLoad] = useState({ status: 'idle' });
-  const [src, setSrc] = useState(null);
-  const [keyframes, setKeyframes] = useState(null);
-  const [segments, setSegments] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [view, setView] = useState({ start: 0, end: 1 });
+  const [doc, setDoc] = useState<MediaDoc | null>(null);
+  const [load, setLoad] = useState<LoadState>({ status: 'idle' });
+  const [src, setSrc] = useState<string | null>(null);
+  const [keyframes, setKeyframes] = useState<number[] | null>(null);
+  const [segments, setSegments] = useState<Range[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [view, setView] = useState<Segment>({ start: 0, end: 1 });
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [plan, setPlan] = useState({ mode: 'encode', name: '' });
-  const [exp, setExp] = useState(IDLE);
+  const [plan, setPlan] = useState<ExportPlan>({ mode: 'encode', name: '', dir: '' });
+  const [exp, setExp] = useState<ExportState>(IDLE);
   const [dropping, setDropping] = useState(false);
   const [skip, setSkip] = useState(() => {
-    const saved = Number(stored('skipSeconds', 5));
+    const saved = Number(stored('skipSeconds', '5'));
     return SKIP_CHOICES.includes(saved) ? saved : 5;
   });
-  const [volume, setVolume] = useState(() => clamp(Number(stored('volume', 1)) || 0, 0, 1));
+  const [volume, setVolume] = useState(() => clamp(Number(stored('volume', '1')) || 0, 0, 1));
   const [muted, setMuted] = useState(() => stored('muted', '0') === '1');
   const [rate, setRate] = useState(() => {
-    const saved = Number(stored('rate', 1));
+    const saved = Number(stored('rate', '1'));
     return RATE_CHOICES.includes(saved) ? saved : 1;
   });
-  const [naming, setNaming] = useState(null);
+  const [naming, setNaming] = useState<Naming | null>(null);
   const [stageHot, setStageHot] = useState(false);
   const stageTimer = useRef(0);
 
   const t = STRINGS[lang];
-  const videoRef = useRef(null);
-  const pendingSeek = useRef(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const pendingSeek = useRef<number | null>(null);
   const previewing = useRef(false);
-  const level = useRef('direct');
+  const level = useRef<Level>('direct');
   const loadToken = useRef(0);
-  const live = useRef({});
+  const live = useRef({} as Live);
   const noticeTimer = useRef(0);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef(0);
-  const undoStack = useRef([]);
+  const undoStack = useRef<UndoEntry[]>([]);
   live.current = { doc, naming, skip, roots, tempRoots, hidden, dest, segments, activeId, view, time, load, exp, plan, t };
 
   const duration = doc ? doc.info.duration : 0;
@@ -115,19 +165,19 @@ export default function App() {
     } catch {}
   }, []);
 
-  const flash = useCallback((message) => {
+  const flash = useCallback((message: string) => {
     setNotice(message);
     clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(''), 4000);
   }, []);
 
-  const showToast = useCallback((text, canUndo = false) => {
+  const showToast = useCallback((text: string, canUndo = false) => {
     setToast({ text, canUndo, id: Date.now() });
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 7000);
   }, []);
 
-  const toggleDir = useCallback((dir) => {
+  const toggleDir = useCallback((dir: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(dir)) next.delete(dir);
@@ -137,7 +187,7 @@ export default function App() {
   }, []);
 
   // Brings a removed folder back, together with everything under it and the folders above it.
-  const unhide = useCallback((dir) => {
+  const unhide = useCallback((dir: string) => {
     setHidden((prev) => {
       const next = prev.filter((h) => !isInside(h, dir) && !isInside(dir, h));
       return next.length === prev.length ? prev : next;
@@ -145,7 +195,7 @@ export default function App() {
   }, []);
 
   const hideDir = useCallback(
-    (dir) => {
+    (dir: string) => {
       setHidden((prev) => [...prev.filter((h) => !isInside(h, dir)), dir]);
       showToast(live.current.t.removedFolder(baseName(dir)));
     },
@@ -153,7 +203,7 @@ export default function App() {
   );
 
   // Makes sure a folder is part of the tree and every folder above it is open.
-  const reveal = useCallback((dir) => {
+  const reveal = useCallback((dir: string) => {
     const { roots: saved, tempRoots: temp } = live.current;
     unhide(dir);
     let root = allRoots(saved, temp).find((r) => isInside(dir, r));
@@ -189,7 +239,7 @@ export default function App() {
     setExpanded((prev) => new Set(prev).add(dir));
   }, [reveal, unhide]);
 
-  const removeRoot = useCallback((dir) => {
+  const removeRoot = useCallback((dir: string) => {
     setRoots((prev) => (prev || []).filter((r) => !samePath(r, dir)));
     setTempRoots((prev) => prev.filter((r) => !samePath(r, dir)));
   }, []);
@@ -201,7 +251,7 @@ export default function App() {
 
   /* ---------- loading a video ---------- */
 
-  const buildProxy = useCallback(async (target, lvl, token) => {
+  const buildProxy = useCallback(async (target: MediaDoc, lvl: ProxyLevel, token: number): Promise<void> => {
     level.current = lvl;
     setSrc(null);
     setLoad({ status: 'loading', percent: 0 });
@@ -209,14 +259,14 @@ export default function App() {
       const url = await api.proxy(target.path, lvl, target.info.duration);
       if (token === loadToken.current) setSrc(url);
     } catch (err) {
-      if (token !== loadToken.current || err.code === 'ABORTED') return;
+      if (token !== loadToken.current || codeOf(err) === 'ABORTED') return;
       if (lvl === 'remux') buildProxy(target, 'transcode', token);
       else setLoad({ status: 'error', message: errorText(live.current.t, err, 'errPreview') });
     }
   }, []);
 
   const openFile = useCallback(
-    async (filePath) => {
+    async (filePath: string): Promise<void> => {
       if (live.current.exp.status === 'running') return;
       const token = ++loadToken.current;
       if (videoRef.current) videoRef.current.pause();
@@ -283,7 +333,7 @@ export default function App() {
 
   // Move, rename or trash a video. If it is the one on screen, let go of it first and reopen it afterwards.
   const fileOp = useCallback(
-    async (filePath, run) => {
+    async (filePath: string, run: () => Promise<string | null>): Promise<FileOpResult> => {
       if (live.current.exp.status === 'running') return { ok: false };
       const current = live.current.doc;
       const wasOpen = Boolean(current && samePath(current.path, filePath));
@@ -306,15 +356,15 @@ export default function App() {
     [closeDoc, rescan, openFile, flash],
   );
 
-  const moveFile = useCallback((src, destDir) => fileOp(src, () => api.moveFile(src, destDir)), [fileOp]);
+  const moveFile = useCallback((src: string, destDir: string) => fileOp(src, () => api.moveFile(src, destDir)), [fileOp]);
   // Deleting and renaming can be undone with Ctrl+Z; each one is remembered here.
-  const remember = useCallback((entry) => {
+  const remember = useCallback((entry: UndoEntry) => {
     undoStack.current.push(entry);
     if (undoStack.current.length > 30) undoStack.current.shift();
   }, []);
 
   const renameFile = useCallback(
-    async (filePath, stem) => {
+    async (filePath: string, stem: string) => {
       const res = await fileOp(filePath, () => api.renameFile(filePath, stem));
       if (!res.ok || !res.next || res.next === filePath) return;
       remember({ type: 'rename', from: filePath, to: res.next });
@@ -323,7 +373,7 @@ export default function App() {
     [fileOp, remember, showToast],
   );
   const trashFile = useCallback(
-    async (filePath) => {
+    async (filePath: string) => {
       const res = await fileOp(filePath, async () => {
         await api.trashFile(filePath);
         return null;
@@ -357,7 +407,7 @@ export default function App() {
       showToast(errorText(text, err, 'errUndo'));
     }
   }, [fileOp, rescan, openFile, showToast]);
-  const showPath = useCallback((target) => api.showInFolder(target), []);
+  const showPath = useCallback((target: string) => api.showInFolder(target), []);
   // Offered right after an export: the clip is saved, so the original can go to the Recycle Bin.
   const deleteSource = useCallback(() => {
     const { doc: current, exp: state } = live.current;
@@ -366,7 +416,7 @@ export default function App() {
 
   /* ---------- playback ---------- */
 
-  const seek = useCallback((target) => {
+  const seek = useCallback((target: number) => {
     const video = videoRef.current;
     setTime(target);
     if (!video) return;
@@ -378,13 +428,13 @@ export default function App() {
     if (pendingSeek.current === null) return;
     const target = pendingSeek.current;
     pendingSeek.current = null;
-    videoRef.current.currentTime = target;
+    if (videoRef.current) videoRef.current.currentTime = target;
   };
 
   // Jump back or ahead without stopping playback. Inside a range the jump stops at the range's edge,
   // so reviewing a clip never flies out of it; a second press from the edge leaves the range.
   const skipBy = useCallback(
-    (dir) => {
+    (dir: 1 | -1) => {
       const { doc: current, skip: amount, time: now, segments: segs } = live.current;
       if (!current) return;
       const base = pendingSeek.current ?? (videoRef.current ? videoRef.current.currentTime : now);
@@ -413,7 +463,7 @@ export default function App() {
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
     const { segments: segs, load: state, doc: target } = live.current;
-    if (!video || state.status !== 'ready' || !segs.length) return;
+    if (!video || !target || state.status !== 'ready' || !segs.length) return;
     if (!video.paused) {
       video.pause();
       return;
@@ -436,7 +486,7 @@ export default function App() {
   // While previewing, playback skips the gaps between ranges and stops after the last one.
   useEffect(() => {
     if (!playing) return undefined;
-    let raf;
+    let raf = 0;
     const loop = () => {
       const video = videoRef.current;
       if (video) {
@@ -464,18 +514,19 @@ export default function App() {
 
   /* ---------- ranges ---------- */
 
-  const applySegments = useCallback((next) => {
+  const applySegments = useCallback((next: Range[]) => {
     live.current.segments = next;
     setSegments(next);
     setExp((prev) => (prev.status === 'running' ? prev : IDLE));
   }, []);
 
   const onEdge = useCallback(
-    (id, edge, target) => {
+    (id: number, edge: Edge, target: number) => {
       const { segments: segs, doc: current } = live.current;
       if (!current) return;
       const next = moveEdge(segs, id, edge, target, current.info.duration, minLen);
       const seg = next.find((s) => s.id === id);
+      if (!seg) return;
       applySegments(next);
       if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
       // Half a frame inside the range, so the picture is the first (or last) frame the export will contain.
@@ -488,7 +539,7 @@ export default function App() {
 
   // I / O: put the active range's start or end at the playhead, restarting the range if the playhead is past it.
   const markEdge = useCallback(
-    (edge) => {
+    (edge: Edge) => {
       const { segments: segs, activeId: id, time: now, doc: current } = live.current;
       const i = segs.findIndex((s) => s.id === id);
       if (i < 0 || !current) return;
@@ -496,7 +547,7 @@ export default function App() {
       const lower = i > 0 ? segs[i - 1].end : 0;
       const upper = i < segs.length - 1 ? segs[i + 1].start : current.info.duration;
       const at = clamp(now, lower, upper);
-      let next;
+      let next: Range;
       if (edge === 'start') next = at >= seg.end - minLen ? { ...seg, start: at, end: upper } : { ...seg, start: at };
       else next = at <= seg.start + minLen ? { ...seg, start: lower, end: at } : { ...seg, end: at };
       if (next.end - next.start < minLen) return;
@@ -528,7 +579,7 @@ export default function App() {
   }, [keyframes, applySegments]);
 
   const zoom = useCallback(
-    (factor) => {
+    (factor: number) => {
       const { view: v, time: now } = live.current;
       const span = v.end - v.start;
       const nextSpan = clamp(span * factor, Math.min(duration, Math.max(1, 30 / fps)), duration);
@@ -541,7 +592,7 @@ export default function App() {
 
   /* ---------- export ---------- */
 
-  const runExport = useCallback(async (name) => {
+  const runExport = useCallback(async (name?: string) => {
     const { doc: current, segments: segs, exp: state, plan: currentPlan, t: text } = live.current;
     if (!current || state.status === 'running') return;
     if (videoRef.current) videoRef.current.pause();
@@ -556,7 +607,7 @@ export default function App() {
       setExp({ status: 'done', percent: 100, result });
       rescan();
     } catch (err) {
-      if (err.code === 'ABORTED') setExp(IDLE);
+      if (codeOf(err) === 'ABORTED') setExp(IDLE);
       else setExp({ status: 'error', percent: 0, message: errorText(text, err, 'errExport') });
     }
   }, [rescan]);
@@ -569,7 +620,7 @@ export default function App() {
     setNaming({ stem: currentPlan.name.replace(/\.mp4$/i, ''), dir: currentPlan.dir || '' });
   }, []);
   const confirmName = useCallback(
-    (name) => {
+    (name: string) => {
       // An unchanged name is left to the exporter, which names the clip after the range it actually writes.
       const unchanged = live.current.naming && name === live.current.naming.stem;
       setNaming(null);
@@ -581,7 +632,7 @@ export default function App() {
 
   const showResult = useCallback(() => {
     const { exp: state } = live.current;
-    if (state.result) api.showInFolder(state.result.output);
+    if (state.status === 'done') api.showInFolder(state.result.output);
   }, []);
 
   const dismissResult = useCallback(() => setExp(IDLE), []);
@@ -611,7 +662,9 @@ export default function App() {
     const offChanged = api.on('library:changed', rescan);
     const offOpen = api.on('app:open-file', (filePath) => openFile(filePath));
 
-    api.initialFile().then((filePath) => filePath && openFile(filePath));
+    api.initialFile().then((filePath) => {
+      if (filePath) openFile(filePath);
+    });
     return () => {
       offProgress();
       offProxy();
@@ -651,7 +704,7 @@ export default function App() {
     video.playbackRate = rate;
   }, [volume, muted, rate, src, load.status]);
 
-  const changeVolume = useCallback((value) => {
+  const changeVolume = useCallback((value: number) => {
     setVolume(clamp(value, 0, 1));
     setMuted(false);
   }, []);
@@ -683,8 +736,8 @@ export default function App() {
   const toggleSidebar = useCallback(() => setSidebarOpen((prev) => !prev), []);
 
   useEffect(() => {
-    const onKey = (event) => {
-      const tag = event.target.tagName;
+    const onKey = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || live.current.naming) return;
       const { exp: state, doc: current, time: now } = live.current;
       if (state.status === 'running') {
@@ -776,20 +829,20 @@ export default function App() {
   }, [togglePlay, skipBy, toggleMute, wakeStage, undo, seek, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
-    const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
-    const onOver = (event) => {
+    const hasFiles = (event: DragEvent): boolean => Boolean(event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files'));
+    const onOver = (event: DragEvent) => {
       if (!hasFiles(event)) return;
       event.preventDefault();
       setDropping(true);
     };
-    const onLeave = (event) => {
+    const onLeave = (event: DragEvent) => {
       if (!event.relatedTarget) setDropping(false);
     };
-    const onDrop = (event) => {
+    const onDrop = (event: DragEvent) => {
       if (!hasFiles(event)) return;
       event.preventDefault();
       setDropping(false);
-      const file = event.dataTransfer.files[0];
+      const file = event.dataTransfer?.files[0];
       const filePath = file && api.pathForFile(file);
       if (filePath) openFile(filePath);
     };

@@ -1,9 +1,21 @@
-﻿import { memo } from 'react';
+import { memo } from 'react';
 import { FilePlus, Moon, PanelLeft, Sun } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import type { Theme } from '../../../shared/types';
 import icon from '../assets/icon.webp';
 
-function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, onOpenFile, platform }) {
+interface TitleBarProps {
+  fileName: string;
+  theme: Theme;
+  onTheme: () => void;
+  onLang: () => void;
+  onSidebar: () => void;
+  sidebarOpen: boolean;
+  onOpenFile: () => void;
+  platform: string;
+}
+
+function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, onOpenFile, platform }: TitleBarProps) {
   const t = useT();
   return (
     <header className={`titlebar platform-${platform}`}>

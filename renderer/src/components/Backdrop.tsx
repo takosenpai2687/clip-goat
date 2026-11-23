@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 // Slow drifting colour fields plus one large glow that trails the pointer. Sits behind the glass panels.
-export default function Backdrop({ quiet }) {
-  const glow = useRef(null);
+export default function Backdrop({ quiet }: { quiet: boolean }) {
+  const glow = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
@@ -13,11 +13,11 @@ export default function Backdrop({ quiet }) {
     const step = () => {
       current.x += (target.x - current.x) * 0.08;
       current.y += (target.y - current.y) * 0.08;
-      glow.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0)`;
+      if (glow.current) glow.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0)`;
       // Stop the loop once the glow has caught up; the next pointer move restarts it.
       raf = Math.abs(target.x - current.x) + Math.abs(target.y - current.y) > 0.5 ? requestAnimationFrame(step) : 0;
     };
-    const onMove = (event) => {
+    const onMove = (event: PointerEvent) => {
       target.x = event.clientX;
       target.y = event.clientY;
       if (!raf) raf = requestAnimationFrame(step);

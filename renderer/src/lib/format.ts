@@ -1,5 +1,7 @@
+import type { Lang, Strings } from './i18n';
+
 // 75.5 -> "1:15.50"; hours appear only when needed.
-export function formatTime(sec, decimals = 2) {
+export function formatTime(sec: number, decimals = 2): string {
   const s = Math.max(0, Number(sec) || 0);
   const scale = 10 ** decimals;
   const total = Math.round(s * scale) / scale;
@@ -11,17 +13,17 @@ export function formatTime(sec, decimals = 2) {
 }
 
 // Clip length as the headline figure: "3.30" + unit under a minute, otherwise a clock.
-export function formatLength(sec) {
+export function formatLength(sec: number): { value: string; unit: boolean } {
   return sec < 60 ? { value: sec.toFixed(2), unit: true } : { value: formatTime(sec, 1), unit: false };
 }
 
-export function formatSize(bytes) {
+export function formatSize(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
   if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-export function formatDay(ms, t, lang) {
+export function formatDay(ms: number, t: Strings, lang: Lang): string {
   const day = 86400000;
   const startOfToday = new Date().setHours(0, 0, 0, 0);
   const diff = Math.floor((startOfToday - new Date(ms).setHours(0, 0, 0, 0)) / day);
@@ -32,6 +34,6 @@ export function formatDay(ms, t, lang) {
   return new Date(ms).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export function clamp(value, min, max) {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

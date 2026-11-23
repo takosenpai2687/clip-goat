@@ -23,7 +23,7 @@ const zh = {
   missingRoot: '找不到这个文件夹',
   noMatch: '没有符合条件的视频',
   clipTag: '剪辑片段',
-  clipCount: (n) => `已从这个视频剪出 ${n} 个片段`,
+  clipCount: (n: number) => `已从这个视频剪出 ${n} 个片段`,
   more: '更多操作',
   reveal: '在文件夹中显示',
   rename: '重命名',
@@ -31,17 +31,17 @@ const zh = {
   trashConfirm: '再点一次，移到回收站',
   exportHere: '导出到这个文件夹',
   removeRoot: '从资源库移除（不删除文件）',
-  removedFolder: (name) => `已从资源库移除：${name}。用“添加文件夹”可以加回来`,
-  counts: (o, c) => `${o} 个原片 · ${c} 个片段`,
+  removedFolder: (name: string) => `已从资源库移除：${name}。用“添加文件夹”可以加回来`,
+  counts: (o: number, c: number) => `${o} 个原片 · ${c} 个片段`,
   today: '今天',
   yesterday: '昨天',
-  daysAgo: (n) => `${n} 天前`,
+  daysAgo: (n: number) => `${n} 天前`,
   errOp: '操作没有成功',
   undo: '撤销',
-  deleted: (name) => `已移到回收站：${name}`,
-  renamedTo: (name) => `已重命名为：${name}`,
-  undoneDelete: (name) => `已撤销删除：${name}`,
-  undoneRename: (name) => `已撤销重命名，恢复为：${name}`,
+  deleted: (name: string) => `已移到回收站：${name}`,
+  renamedTo: (name: string) => `已重命名为：${name}`,
+  undoneDelete: (name: string) => `已撤销删除：${name}`,
+  undoneRename: (name: string) => `已撤销重命名，恢复为：${name}`,
   nothingToUndo: '没有可以撤销的删除或重命名',
   errUndo: '撤销没有成功',
   errRestore: '回收站里已经找不到这个文件，无法撤销',
@@ -50,10 +50,10 @@ const zh = {
 
   play: '播放（空格）',
   pause: '暂停（空格）',
-  rewind: (n) => `后退 ${n} 秒（J）`,
-  forward: (n) => `前进 ${n} 秒（L）`,
+  rewind: (n: number) => `后退 ${n} 秒（J）`,
+  forward: (n: number) => `前进 ${n} 秒（L）`,
   skipHint: '右键可更改跨度',
-  skipSeconds: (n) => `${n} 秒`,
+  skipSeconds: (n: number) => `${n} 秒`,
   mute: '静音（M）',
   unmute: '取消静音（M）',
   volume: '音量',
@@ -68,7 +68,7 @@ const zh = {
   endHandle: '终点',
   timeline: '时间轨',
   seconds: '秒',
-  ranges: (n) => `${n} 段拼接`,
+  ranges: (n: number) => `${n} 段拼接`,
 
   export: '导出',
   exportTip: '导出（回车）',
@@ -83,7 +83,7 @@ const zh = {
   deleteSourceTip: '把原视频移到回收站，可以从回收站恢复',
   nameTitle: '导出片段',
   nameLabel: '文件名',
-  nameSavedTo: (dir) => `保存到 ${dir}`,
+  nameSavedTo: (dir: string) => `保存到 ${dir}`,
   nameNoMarker: '名字里没有 _clip_，资源库会把它当作原片显示',
   exportTo: '导出位置',
   besideSource: '原视频旁边',
@@ -95,7 +95,7 @@ const zh = {
   fellBack: '这个视频无法直接复制，已自动改用重新编码',
   retry: '重试',
   loading: '正在读取视频',
-  buildingPreview: (p) => `正在生成预览 ${p}%`,
+  buildingPreview: (p: number) => `正在生成预览 ${p}%`,
   errProbe: '读不了这个文件，它可能已损坏，或者不是视频',
   errNoVideo: '这个文件里没有视频画面',
   errNotFound: '找不到这个文件，它可能已被移动或删除',
@@ -126,7 +126,7 @@ const en = {
   missingRoot: 'Cannot find this folder',
   noMatch: 'No videos match',
   clipTag: 'Clip',
-  clipCount: (n) => `${n} clip${n === 1 ? '' : 's'} cut from this video`,
+  clipCount: (n: number) => `${n} clip${n === 1 ? '' : 's'} cut from this video`,
   more: 'More actions',
   reveal: 'Show in folder',
   rename: 'Rename',
@@ -134,17 +134,17 @@ const en = {
   trashConfirm: 'Click again to move to Recycle Bin',
   exportHere: 'Export into this folder',
   removeRoot: 'Remove from library (keeps the files)',
-  removedFolder: (name) => `Removed from the library: ${name}. Use Add folder to bring it back`,
-  counts: (o, c) => `${o} original${o === 1 ? '' : 's'} · ${c} clip${c === 1 ? '' : 's'}`,
+  removedFolder: (name: string) => `Removed from the library: ${name}. Use Add folder to bring it back`,
+  counts: (o: number, c: number) => `${o} original${o === 1 ? '' : 's'} · ${c} clip${c === 1 ? '' : 's'}`,
   today: 'Today',
   yesterday: 'Yesterday',
-  daysAgo: (n) => `${n} days ago`,
+  daysAgo: (n: number) => `${n} days ago`,
   errOp: 'That did not work',
   undo: 'Undo',
-  deleted: (name) => `Moved to the Recycle Bin: ${name}`,
-  renamedTo: (name) => `Renamed to: ${name}`,
-  undoneDelete: (name) => `Delete undone: ${name}`,
-  undoneRename: (name) => `Rename undone, back to: ${name}`,
+  deleted: (name: string) => `Moved to the Recycle Bin: ${name}`,
+  renamedTo: (name: string) => `Renamed to: ${name}`,
+  undoneDelete: (name: string) => `Delete undone: ${name}`,
+  undoneRename: (name: string) => `Rename undone, back to: ${name}`,
   nothingToUndo: 'No delete or rename to undo',
   errUndo: 'Undo did not work',
   errRestore: 'The file is no longer in the Recycle Bin, so the delete cannot be undone',
@@ -153,10 +153,10 @@ const en = {
 
   play: 'Play (Space)',
   pause: 'Pause (Space)',
-  rewind: (n) => `Back ${n} seconds (J)`,
-  forward: (n) => `Forward ${n} seconds (L)`,
+  rewind: (n: number) => `Back ${n} seconds (J)`,
+  forward: (n: number) => `Forward ${n} seconds (L)`,
   skipHint: 'Right-click to change the amount',
-  skipSeconds: (n) => `${n} seconds`,
+  skipSeconds: (n: number) => `${n} seconds`,
   mute: 'Mute (M)',
   unmute: 'Unmute (M)',
   volume: 'Volume',
@@ -171,7 +171,7 @@ const en = {
   endHandle: 'End',
   timeline: 'Timeline',
   seconds: 's',
-  ranges: (n) => `${n} ranges joined`,
+  ranges: (n: number) => `${n} ranges joined`,
 
   export: 'Export',
   exportTip: 'Export (Enter)',
@@ -186,7 +186,7 @@ const en = {
   deleteSourceTip: 'Move the original video to the Recycle Bin; it can be restored from there',
   nameTitle: 'Export clip',
   nameLabel: 'File name',
-  nameSavedTo: (dir) => `Saved to ${dir}`,
+  nameSavedTo: (dir: string) => `Saved to ${dir}`,
   nameNoMarker: 'Without _clip_ in the name, the library will list it as an original',
   exportTo: 'Export to',
   besideSource: 'Next to the source video',
@@ -198,7 +198,7 @@ const en = {
   fellBack: 'This video could not be copied directly, so it was re-encoded instead',
   retry: 'Retry',
   loading: 'Reading the video',
-  buildingPreview: (p) => `Building a preview ${p}%`,
+  buildingPreview: (p: number) => `Building a preview ${p}%`,
   errProbe: 'Cannot read this file. It may be damaged, or not a video',
   errNoVideo: 'This file has no video picture',
   errNotFound: 'Cannot find this file. It may have been moved or deleted',
@@ -206,20 +206,26 @@ const en = {
   errExport: 'Export failed',
 };
 
-export const STRINGS = { zh, en };
+export type Strings = typeof zh;
+export type Lang = 'zh' | 'en';
 
-export const I18nContext = createContext(zh);
+export const STRINGS: Record<Lang, Strings> = { zh, en };
 
-export function useT() {
+export const I18nContext = createContext<Strings>(zh);
+
+export function useT(): Strings {
   return useContext(I18nContext);
 }
 
-export function defaultLang() {
+export function defaultLang(): Lang {
   return (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
 
-export function errorText(t, err, fallbackKey) {
-  const byCode = {
+type MessageKey = { [K in keyof Strings]: Strings[K] extends string ? K : never }[keyof Strings];
+
+export function errorText(t: Strings, err: unknown, fallbackKey: MessageKey): string {
+  const e = err as { code?: string; message?: string } | null;
+  const byCode: Record<string, string> = {
     PROBE_FAILED: t.errProbe,
     NO_VIDEO: t.errNoVideo,
     NOT_FOUND: t.errNotFound,
@@ -229,5 +235,5 @@ export function errorText(t, err, fallbackKey) {
     BAD_NAME: t.errBadName,
     RESTORE_FAILED: t.errRestore,
   };
-  return (err && byCode[err.code]) || t[fallbackKey] || (err && err.message) || '';
+  return (e && e.code && byCode[e.code]) || t[fallbackKey] || (e && e.message) || '';
 }

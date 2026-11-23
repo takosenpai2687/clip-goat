@@ -1,22 +1,21 @@
-'use strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { ClipLabel, Origin, Segment } from './types';
 
-const fs = require('node:fs');
-const path = require('node:path');
+export const CLIP_MARKER = '_clip_';
 
-const CLIP_MARKER = '_clip_';
+export const VIDEO_EXTS = ['.mp4', '.mkv', '.mov', '.webm', '.m4v', '.avi', '.ts', '.m2ts', '.flv', '.wmv', '.mpg', '.mpeg', '.3gp'];
 
-const VIDEO_EXTS = ['.mp4', '.mkv', '.mov', '.webm', '.m4v', '.avi', '.ts', '.m2ts', '.flv', '.wmv', '.mpg', '.mpeg', '.3gp'];
-
-function isVideoFile(filename) {
+export function isVideoFile(filename: string): boolean {
   return VIDEO_EXTS.includes(path.extname(String(filename)).toLowerCase());
 }
 
-function isClippedFile(filename) {
+export function isClippedFile(filename: string): boolean {
   return path.basename(String(filename)).includes(CLIP_MARKER);
 }
 
 // "Game_clip_1s-2s.mp4" -> { head: "Game", tail: "1s-2s" }; tail is empty for originals.
-function splitClipName(filename) {
+export function splitClipName(filename: string): ClipLabel {
   const name = path.basename(String(filename));
   const at = name.lastIndexOf(CLIP_MARKER);
   if (at < 0) return { head: name, tail: '' };
@@ -25,12 +24,12 @@ function splitClipName(filename) {
 }
 
 // 112.5 -> "112.5", 115.83 -> "115.83", 3 -> "3"
-function formatSeconds(sec) {
+export function formatSeconds(sec: number): string {
   return String(Number(Number(sec).toFixed(2)));
 }
 
 // {original-name}_clip_{start}s-{end}s.mp4; joined clips add "_{n}parts".
-function buildClipName(inputPath, segments, ext = '.mp4') {
+export function buildClipName(inputPath: string, segments: Segment[], ext = '.mp4'): string {
   const base = path.basename(inputPath, path.extname(inputPath));
   const first = segments[0];
   const last = segments[segments.length - 1];
@@ -39,7 +38,7 @@ function buildClipName(inputPath, segments, ext = '.mp4') {
   return `${base}${CLIP_MARKER}${range}${parts}${ext}`;
 }
 
-function defaultOutputPath(inputPath, segments, ext = '.mp4') {
+export function defaultOutputPath(inputPath: string, segments: Segment[], ext = '.mp4'): string {
   return path.join(path.dirname(inputPath), buildClipName(inputPath, segments, ext));
 }
 
@@ -47,16 +46,16 @@ function defaultOutputPath(inputPath, segments, ext = '.mp4') {
 //   clipgoat:{"v":1,"source":"Game.mp4","segments":[[112.5,115.8]]}
 // source is the original video's file name; segments are ranges on the original's timeline.
 const ORIGIN_PREFIX = 'clipgoat:';
-const round3 = (n) => Math.round(n * 1000) / 1000;
+const round3 = (n: number): number => Math.round(n * 1000) / 1000;
 
-function encodeOrigin(origin) {
+export function encodeOrigin(origin: Origin): string {
   return ORIGIN_PREFIX + JSON.stringify({ v: 1, source: origin.source, segments: origin.segments.map((s) => [round3(s.start), round3(s.end)]) });
 }
 
-function parseOrigin(comment) {
+export function parseOrigin(comment: unknown): Origin | null {
   if (typeof comment !== 'string' || !comment.startsWith(ORIGIN_PREFIX)) return null;
   try {
-    const data = JSON.parse(comment.slice(ORIGIN_PREFIX.length));
+    const data = JSON.parse(comment.slice(ORIGIN_PREFIX.length)) as { source?: unknown; segments: [unknown, unknown][] };
     const source = path.basename(String(data.source || ''));
     const segments = data.segments.map(([start, end]) => ({ start: Number(start), end: Number(end) }));
     if (!source || /[\\/:*?"<>|]/.test(source)) return null;
@@ -69,8 +68,8 @@ function parseOrigin(comment) {
 
 // Translates ranges on a clip's timeline into ranges on its original's timeline.
 // The clip's timeline is its origin segments laid end to end.
-function mapToSource(segments, originSegments) {
-  const out = [];
+export function mapToSource(segments: Segment[], originSegments: Segment[]): Segment[] {
+  const out: Segment[] = [];
   for (const seg of segments) {
     let offset = 0;
     originSegments.forEach((o, i) => {
@@ -86,7 +85,7 @@ function mapToSource(segments, originSegments) {
 }
 
 // Where a new clip comes from: the input itself, or the input's own original when the input is a clip.
-function lineage(origin, inputName, segments) {
+export function lineage(origin: Origin | null | undefined, inputName: string, segments: Segment[]): Origin {
   if (origin) {
     const mapped = mapToSource(segments, origin.segments);
     if (mapped.length) return { source: origin.source, segments: mapped };
@@ -95,7 +94,7 @@ function lineage(origin, inputName, segments) {
 }
 
 // name.mp4 -> name_2.mp4 -> name_3.mp4 ...
-function uniquePath(filePath, exists = fs.existsSync) {
+export function uniquePath(filePath: string, exists: (p: string) => boolean = fs.existsSync): string {
   if (!exists(filePath)) return filePath;
   const ext = path.extname(filePath);
   const stem = filePath.slice(0, filePath.length - ext.length);
@@ -104,19 +103,3 @@ function uniquePath(filePath, exists = fs.existsSync) {
     if (!exists(candidate)) return candidate;
   }
 }
-
-module.exports = {
-  CLIP_MARKER,
-  VIDEO_EXTS,
-  isVideoFile,
-  isClippedFile,
-  splitClipName,
-  formatSeconds,
-  buildClipName,
-  defaultOutputPath,
-  uniquePath,
-  encodeOrigin,
-  parseOrigin,
-  mapToSource,
-  lineage,
-};

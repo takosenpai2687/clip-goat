@@ -1,17 +1,6 @@
-'use strict';
-
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {
-  isClippedFile,
-  buildClipName,
-  uniquePath,
-  planSegments,
-  validateSegments,
-  encodeOrigin,
-  parseOrigin,
-  lineage,
-} = require('../shared');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { isClippedFile, buildClipName, uniquePath, planSegments, validateSegments, encodeOrigin, parseOrigin, lineage } from '../shared';
 
 test('isClippedFile looks only at the _clip_ marker in the file name', () => {
   assert.equal(isClippedFile('Game_20261122_1430_clip_112.5s-115.8s.mp4'), true);
@@ -20,12 +9,12 @@ test('isClippedFile looks only at the _clip_ marker in the file name', () => {
 });
 
 test('buildClipName follows the template and trims decimals', () => {
+  assert.equal(buildClipName('D:\\v\\Game_20261122_1430.mp4', [{ start: 112.5, end: 115.8 }]), 'Game_20261122_1430_clip_112.5s-115.8s.mp4');
   assert.equal(
-    buildClipName('D:\\v\\Game_20261122_1430.mp4', [{ start: 112.5, end: 115.8 }]),
-    'Game_20261122_1430_clip_112.5s-115.8s.mp4',
-  );
-  assert.equal(
-    buildClipName('a.b.mkv', [{ start: 0, end: 3.004 }, { start: 10, end: 12.256 }]),
+    buildClipName('a.b.mkv', [
+      { start: 0, end: 3.004 },
+      { start: 10, end: 12.256 },
+    ]),
     'a.b_clip_0s-12.26s_2parts.mp4',
   );
 });
@@ -43,7 +32,18 @@ test('planSegments: auto copies only when every start sits on a keyframe', () =>
     segments: [{ start: 4, end: 5 }],
   });
   assert.equal(planSegments([{ start: 4.5, end: 5 }], kfs, 'auto', 60).mode, 'encode');
-  assert.equal(planSegments([{ start: 2, end: 3 }, { start: 4.5, end: 5 }], kfs, 'auto', 60).mode, 'encode');
+  assert.equal(
+    planSegments(
+      [
+        { start: 2, end: 3 },
+        { start: 4.5, end: 5 },
+      ],
+      kfs,
+      'auto',
+      60,
+    ).mode,
+    'encode',
+  );
 });
 
 test('planSegments: copy snaps starts back to the previous keyframe', () => {
@@ -61,12 +61,23 @@ test('validateSegments rejects bad ranges and clamps the end to the duration', (
 });
 
 test('lineage: a clip cut from a clip points back to the original video', () => {
-  const origin = parseOrigin(encodeOrigin({ source: 'Game.mp4', segments: [{ start: 10, end: 14 }, { start: 30, end: 36 }] }));
+  const origin = parseOrigin(
+    encodeOrigin({
+      source: 'Game.mp4',
+      segments: [
+        { start: 10, end: 14 },
+        { start: 30, end: 36 },
+      ],
+    }),
+  );
   assert.deepEqual(lineage(origin, 'Game_clip_10s-36s_2parts.mp4', [{ start: 1, end: 3 }]), {
     source: 'Game.mp4',
     segments: [{ start: 11, end: 13 }],
   });
-  assert.deepEqual(lineage(origin, 'x.mp4', [{ start: 3, end: 6 }]).segments, [{ start: 13, end: 14 }, { start: 30, end: 32 }]);
+  assert.deepEqual(lineage(origin, 'x.mp4', [{ start: 3, end: 6 }]).segments, [
+    { start: 13, end: 14 },
+    { start: 30, end: 32 },
+  ]);
   assert.deepEqual(lineage(null, 'D:\\v\\Game.mp4', [{ start: 1, end: 2 }]), { source: 'Game.mp4', segments: [{ start: 1, end: 2 }] });
   assert.equal(parseOrigin('some other comment'), null);
 });
