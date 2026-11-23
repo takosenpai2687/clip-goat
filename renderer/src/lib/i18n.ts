@@ -239,7 +239,19 @@ const en = {
 export type Strings = typeof zh;
 export type Lang = 'zh' | 'en';
 
-export const STRINGS: Record<Lang, Strings> = { zh, en };
+// macOS calls the Recycle Bin the Trash.
+function renamed<T extends object>(table: T, from: string, to: string): T {
+  const swap = (text: unknown): unknown => (typeof text === 'string' ? text.split(from).join(to) : text);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(table)) {
+    out[key] = typeof value === 'function' ? (...args: unknown[]) => swap((value as (...a: unknown[]) => unknown)(...args)) : swap(value);
+  }
+  return out as T;
+}
+
+const onMac = typeof window !== 'undefined' && window.clipgoat?.platform === 'darwin';
+
+export const STRINGS: Record<Lang, Strings> = onMac ? { zh: renamed(zh, '回收站', '废纸篓'), en: renamed(en, 'Recycle Bin', 'Trash') } : { zh, en };
 
 export const I18nContext = createContext<Strings>(zh);
 

@@ -27,6 +27,8 @@ const TITLEBAR: Record<Theme, { color: string; symbolColor: string; background: 
 };
 
 let win: BrowserWindow | null = null;
+// macOS hands over files opened from Finder or dropped on the Dock icon through an event, possibly before the window exists.
+let pendingFile: string | null = null;
 let exportJob: AbortController | null = null;
 let proxyJob: AbortController | null = null;
 const keyframeCache = new Map<string, { mtime: number; times: number[] }>();
@@ -247,7 +249,11 @@ function registerIpc(): void {
     }
   });
 
-  handle('app:initialFile', () => initialFile(process.argv));
+  handle('app:initialFile', () => {
+    const file = pendingFile || initialFile(process.argv);
+    pendingFile = null;
+    return file;
+  });
 
   handle('update:check', () => updater.check());
   handle('update:download', () => updater.download());
@@ -265,6 +271,7 @@ function createWindow(): void {
     icon: path.join(ROOT, 'assets', 'icon.png'),
     backgroundColor: TITLEBAR.dark.background,
     titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 16, y: 15 },
     titleBarOverlay:
       process.platform === 'darwin' ? undefined : { color: TITLEBAR.dark.color, symbolColor: TITLEBAR.dark.symbolColor, height: 44 },
     webPreferences: {
@@ -304,10 +311,27 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
-    Menu.setApplicationMenu(null);
+    // macOS needs an application menu for Quit, Hide and clipboard shortcuts. Undo is left out on purpose
+    // so that Cmd+Z reaches the app's own undo.
+    Menu.setApplicationMenu(
+      process.platform === 'darwin'
+        ? Menu.buildFromTemplate([
+            { role: 'appMenu' },
+            { label: 'Edit', submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+            { role: 'windowMenu' },
+          ])
+        : null,
+    );
     protocol.handle('media', serveMedia);
     registerIpc();
     createWindow();
+  });
+
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault();
+    if (!shared.isVideoFile(filePath)) return;
+    if (win) send('app:open-file', filePath);
+    else pendingFile = filePath;
   });
 
   app.on('window-all-closed', () => {

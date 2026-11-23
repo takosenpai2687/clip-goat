@@ -441,8 +441,10 @@ export default function App() {
         return null;
       });
       if (!res.ok) return;
-      remember({ type: 'trash', path: filePath, wasOpen: res.wasOpen });
-      showToast(live.current.t.deleted(baseName(filePath)), true);
+      // Only Windows can put a file back from the bin.
+      const canUndo = api.platform === 'win32';
+      if (canUndo) remember({ type: 'trash', path: filePath, wasOpen: res.wasOpen });
+      showToast(live.current.t.deleted(baseName(filePath)), canUndo);
     },
     [fileOp, remember, showToast],
   );

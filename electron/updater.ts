@@ -33,8 +33,8 @@ export function createUpdater(onProgress: (percent: number) => void): Updater {
   return {
     async check() {
       const current = app.getVersion();
-      // A build run from source has no installer to replace.
-      if (!app.isPackaged) return { status: 'unsupported', current, version: current };
+      // A build run from source has no installer to replace, and only the Windows installer is published.
+      if (!app.isPackaged || process.platform !== 'win32') return { status: 'unsupported', current, version: current };
       try {
         const result = await autoUpdater.checkForUpdates();
         const version = result?.updateInfo.version ?? current;

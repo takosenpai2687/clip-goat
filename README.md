@@ -133,6 +133,8 @@ npm run dist
 
 安装包生成在 `release` 文件夹中。只使用命令行时，执行 `npm install` 和 `npm run build` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
 
+`npm run dist` 为当前系统打包：在 Windows 上生成安装包，在 macOS 上生成 `.dmg`（Intel 和 Apple Silicon 均可）。macOS 版本没有发布包，也没有在实机上测试过；它使用临时签名，只适合在构建它的那台电脑上使用。应用内更新和撤销删除只在 Windows 上可用。
+
 中国大陆的网络环境下，安装依赖前需要设置镜像：
 
 ```powershell
@@ -289,6 +291,8 @@ npm run dist
 ```
 
 The installer is written to the `release` folder. To use only the command line, run `npm install` and `npm run build`, then `npm link`; the `clip-goat` command is then available in any directory.
+
+`npm run dist` packages for the system it runs on: an installer on Windows, a `.dmg` on macOS (Intel or Apple Silicon). There is no published macOS build and it has not been tested on a real Mac; it is ad-hoc signed, so it is only meant for the computer that built it. In-app updates and undoing a delete work on Windows only.
 
 On networks in mainland China, set these mirrors before installing the dependencies:
 

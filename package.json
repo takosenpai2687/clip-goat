@@ -19,7 +19,7 @@
     "start": "npm run build && electron .",
     "cli": "node dist/cli/index.js",
     "test": "tsc -p tsconfig.json && node --test \"dist/test/*.test.js\"",
-    "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never"
+    "dist": "npm run typecheck && npm run build && electron-builder --publish never"
   },
   "dependencies": {
     "electron-updater": "6.8.11",
@@ -38,10 +38,7 @@
       "dist/cli/**",
       "renderer/dist/**",
       "assets/icon.png",
-      "package.json",
-      "!node_modules/ffprobe-static/bin/darwin/**",
-      "!node_modules/ffprobe-static/bin/linux/**",
-      "!node_modules/ffprobe-static/bin/win32/ia32/**"
+      "package.json"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
@@ -51,12 +48,30 @@
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "files": [
+        "!node_modules/ffprobe-static/bin/darwin/**",
+        "!node_modules/ffprobe-static/bin/linux/**",
+        "!node_modules/ffprobe-static/bin/win32/ia32/**"
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Clip-Goat-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon-mac.png",
+      "category": "public.app-category.video",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "files": [
+        "!node_modules/ffprobe-static/bin/linux/**",
+        "!node_modules/ffprobe-static/bin/win32/**"
+      ]
     },
     "publish": [
       {
