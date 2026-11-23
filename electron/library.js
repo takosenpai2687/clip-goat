@@ -120,6 +120,56 @@ async function renameFile(src, stem) {
   return target;
 }
 
+// Reads one Recycle Bin index file ($I...) and returns the path the item was deleted from.
+function readBinIndex(file) {
+  try {
+    const buf = fs.readFileSync(file);
+    const version = buf.readBigInt64LE(0);
+    const raw = version === 2n ? buf.toString('utf16le', 28, 28 + buf.readUInt32LE(24) * 2) : buf.toString('utf16le', 24, 24 + 520);
+    return { from: raw.replace(/\0.*$/s, ''), deletedAt: buf.readBigInt64LE(16) };
+  } catch {
+    return null;
+  }
+}
+
+// Puts a file that was sent to the Recycle Bin back where it was.
+// Windows keeps each deleted file as a pair: $I<id> (where it came from) and $R<id> (the data).
+async function restoreFile(original) {
+  if (!shared.isVideoFile(original)) throw Object.assign(new Error('Not a video file.'), { code: 'NOT_FOUND' });
+  if (process.platform !== 'win32') throw Object.assign(new Error('Undo delete is only available on Windows.'), { code: 'RESTORE_FAILED' });
+  if (fs.existsSync(original)) throw Object.assign(new Error('A file with that name already exists.'), { code: 'EXISTS' });
+
+  const bin = path.join(path.parse(original).root, '$Recycle.Bin');
+  const ext = path.extname(original).toLowerCase();
+  let best = null;
+  let users = [];
+  try {
+    users = fs.readdirSync(bin);
+  } catch {}
+  for (const user of users) {
+    let names;
+    try {
+      names = fs.readdirSync(path.join(bin, user));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.startsWith('$I') || path.extname(name).toLowerCase() !== ext) continue;
+      const index = path.join(bin, user, name);
+      const info = readBinIndex(index);
+      if (!info || info.from.toLowerCase() !== original.toLowerCase()) continue;
+      if (!best || info.deletedAt > best.deletedAt) best = { index, data: path.join(bin, user, '$R' + name.slice(2)), deletedAt: info.deletedAt };
+    }
+  }
+  if (!best || !fs.existsSync(best.data)) {
+    throw Object.assign(new Error('The file is no longer in the Recycle Bin.'), { code: 'RESTORE_FAILED' });
+  }
+  await fs.promises.mkdir(path.dirname(original), { recursive: true });
+  await fs.promises.rename(best.data, original);
+  await fs.promises.unlink(best.index).catch(() => {});
+  return original;
+}
+
 // Watches every root recursively and reports changes once things settle.
 function createWatcher(onChange) {
   let watchers = [];
@@ -148,4 +198,4 @@ function createWatcher(onChange) {
   };
 }
 
-module.exports = { scanLibrary, moveFile, renameFile, assertVideo, createWatcher };
+module.exports = { scanLibrary, moveFile, renameFile, restoreFile, assertVideo, createWatcher };

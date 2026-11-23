@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('clipgoat', {
   moveFile: (src, destDir) => call('fs:move', src, destDir),
   renameFile: (src, stem) => call('fs:rename', src, stem),
   trashFile: (filePath) => call('fs:trash', filePath),
+  restoreFile: (filePath) => call('fs:restore', filePath),
   probe: (filePath) => call('media:probe', filePath),
   keyframes: (filePath, startTime) => call('media:keyframes', filePath, startTime),
   proxy: (filePath, level, duration) => call('media:proxy', filePath, level, duration),

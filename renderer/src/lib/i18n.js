@@ -36,6 +36,14 @@ const zh = {
   yesterday: '昨天',
   daysAgo: (n) => `${n} 天前`,
   errOp: '操作没有成功',
+  undo: '撤销',
+  deleted: (name) => `已移到回收站：${name}`,
+  renamedTo: (name) => `已重命名为：${name}`,
+  undoneDelete: (name) => `已撤销删除：${name}`,
+  undoneRename: (name) => `已撤销重命名，恢复为：${name}`,
+  nothingToUndo: '没有可以撤销的删除或重命名',
+  errUndo: '撤销没有成功',
+  errRestore: '回收站里已经找不到这个文件，无法撤销',
   errExists: '已经有同名的文件',
   errBadName: '这个名字不能用',
 
@@ -130,6 +138,14 @@ const en = {
   yesterday: 'Yesterday',
   daysAgo: (n) => `${n} days ago`,
   errOp: 'That did not work',
+  undo: 'Undo',
+  deleted: (name) => `Moved to the Recycle Bin: ${name}`,
+  renamedTo: (name) => `Renamed to: ${name}`,
+  undoneDelete: (name) => `Delete undone: ${name}`,
+  undoneRename: (name) => `Rename undone, back to: ${name}`,
+  nothingToUndo: 'No delete or rename to undo',
+  errUndo: 'Undo did not work',
+  errRestore: 'The file is no longer in the Recycle Bin, so the delete cannot be undone',
   errExists: 'A file with that name already exists',
   errBadName: 'That name is not allowed',
 
@@ -209,6 +225,7 @@ export function errorText(t, err, fallbackKey) {
     EXPORT_FAILED: t.errExport,
     EXISTS: t.errExists,
     BAD_NAME: t.errBadName,
+    RESTORE_FAILED: t.errRestore,
   };
   return (err && byCode[err.code]) || t[fallbackKey] || (err && err.message) || '';
 }

@@ -133,6 +133,7 @@ function registerIpc() {
   handle('library:defaultRoot', () => app.getPath('videos'));
   handle('fs:move', (src, destDir) => library.moveFile(src, destDir));
   handle('fs:rename', (src, stem) => library.renameFile(src, stem));
+  handle('fs:restore', (filePath) => library.restoreFile(filePath));
   handle('fs:trash', async (filePath) => {
     library.assertVideo(filePath);
     await shell.trashItem(filePath);

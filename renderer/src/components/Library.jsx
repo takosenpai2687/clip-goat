@@ -59,8 +59,9 @@ function MidName({ text, className }) {
   );
 }
 
-// Puts each clip right under the original it was cut from. Clips whose original is gone come last,
-// with the first clip of each source standing in as the head of its group.
+// Puts each clip right under the original it was cut from. When the original is gone, its clips stay
+// together with the first one as the head of the group. Groups are ordered newest first, so clips never
+// sink to the bottom of the folder when their original is deleted.
 function grouped(files) {
   const stem = (f) => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
   const byHead = new Map();
@@ -70,18 +71,23 @@ function grouped(files) {
     if (!byHead.has(key)) byHead.set(key, []);
     byHead.get(key).push(f);
   }
-  const out = [];
+  const groups = [];
   for (const f of files) {
     if (f.clipped) continue;
     const clips = byHead.get(stem(f)) || [];
-    out.push({ file: f, child: false });
-    clips.forEach((clip, i) => out.push({ file: clip, child: true, last: i === clips.length - 1 }));
+    groups.push({
+      at: f.mtime,
+      rows: [{ file: f, child: false }, ...clips.map((clip, i) => ({ file: clip, child: true, last: i === clips.length - 1 }))],
+    });
     byHead.delete(stem(f));
   }
   for (const clips of byHead.values()) {
-    clips.forEach((clip, i) => out.push({ file: clip, child: i > 0, last: i === clips.length - 1 }));
+    groups.push({
+      at: Math.max(...clips.map((clip) => clip.mtime)),
+      rows: clips.map((clip, i) => ({ file: clip, child: i > 0, last: i === clips.length - 1 })),
+    });
   }
-  return out;
+  return groups.sort((a, b) => b.at - a.at).flatMap((group) => group.rows);
 }
 
 function tally(trees) {

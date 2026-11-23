@@ -27,6 +27,7 @@ const storedJson = (key, fallback) => {
   }
 };
 const samePath = (a, b) => a.toLowerCase() === b.toLowerCase();
+const baseName = (p) => p.split(/[\\/]/).pop();
 const isInside = (dir, root) => samePath(dir, root) || dir.toLowerCase().startsWith(root.toLowerCase().replace(/[\\/]+$/, '') + (root.includes('/') ? '/' : '\\'));
 const allRoots = (roots, tempRoots) => [...(roots || []), ...tempRoots.filter((p) => !(roots || []).some((r) => samePath(r, p)))];
 const extOf = (name) => name.split('.').pop().toLowerCase();
@@ -89,6 +90,9 @@ export default function App() {
   const loadToken = useRef(0);
   const live = useRef({});
   const noticeTimer = useRef(0);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(0);
+  const undoStack = useRef([]);
   live.current = { doc, naming, skip, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
 
   const duration = doc ? doc.info.duration : 0;
@@ -113,6 +117,12 @@ export default function App() {
     setNotice(message);
     clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(''), 4000);
+  }, []);
+
+  const showToast = useCallback((text, canUndo = false) => {
+    setToast({ text, canUndo, id: Date.now() });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 7000);
   }, []);
 
   const toggleDir = useCallback((dir) => {
@@ -248,7 +258,7 @@ export default function App() {
   // Move, rename or trash a video. If it is the one on screen, let go of it first and reopen it afterwards.
   const fileOp = useCallback(
     async (filePath, run) => {
-      if (live.current.exp.status === 'running') return;
+      if (live.current.exp.status === 'running') return { ok: false };
       const current = live.current.doc;
       const wasOpen = Boolean(current && samePath(current.path, filePath));
       if (wasOpen) {
@@ -259,25 +269,68 @@ export default function App() {
         const next = await run();
         await rescan();
         if (wasOpen && next) openFile(next);
+        return { ok: true, next, wasOpen };
       } catch (err) {
         flash(errorText(live.current.t, err, 'errOp'));
         rescan();
         if (wasOpen) openFile(filePath);
+        return { ok: false };
       }
     },
     [closeDoc, rescan, openFile, flash],
   );
 
   const moveFile = useCallback((src, destDir) => fileOp(src, () => api.moveFile(src, destDir)), [fileOp]);
-  const renameFile = useCallback((filePath, stem) => fileOp(filePath, () => api.renameFile(filePath, stem)), [fileOp]);
+  // Deleting and renaming can be undone with Ctrl+Z; each one is remembered here.
+  const remember = useCallback((entry) => {
+    undoStack.current.push(entry);
+    if (undoStack.current.length > 30) undoStack.current.shift();
+  }, []);
+
+  const renameFile = useCallback(
+    async (filePath, stem) => {
+      const res = await fileOp(filePath, () => api.renameFile(filePath, stem));
+      if (!res.ok || !res.next || res.next === filePath) return;
+      remember({ type: 'rename', from: filePath, to: res.next });
+      showToast(live.current.t.renamedTo(baseName(res.next)), true);
+    },
+    [fileOp, remember, showToast],
+  );
   const trashFile = useCallback(
-    (filePath) =>
-      fileOp(filePath, async () => {
+    async (filePath) => {
+      const res = await fileOp(filePath, async () => {
         await api.trashFile(filePath);
         return null;
-      }),
-    [fileOp],
+      });
+      if (!res.ok) return;
+      remember({ type: 'trash', path: filePath, wasOpen: res.wasOpen });
+      showToast(live.current.t.deleted(baseName(filePath)), true);
+    },
+    [fileOp, remember, showToast],
   );
+
+  const undo = useCallback(async () => {
+    const text = live.current.t;
+    const entry = undoStack.current.pop();
+    if (!entry) {
+      showToast(text.nothingToUndo);
+      return;
+    }
+    if (entry.type === 'rename') {
+      const name = baseName(entry.from);
+      const res = await fileOp(entry.to, () => api.renameFile(entry.to, name.slice(0, name.lastIndexOf('.'))));
+      showToast(res.ok ? text.undoneRename(name) : text.errUndo);
+      return;
+    }
+    try {
+      await api.restoreFile(entry.path);
+      await rescan();
+      showToast(text.undoneDelete(baseName(entry.path)));
+      if (entry.wasOpen && !live.current.doc) openFile(entry.path);
+    } catch (err) {
+      showToast(errorText(text, err, 'errUndo'));
+    }
+  }, [fileOp, rescan, openFile, showToast]);
   const showPath = useCallback((target) => api.showInFolder(target), []);
   // Offered right after an export: the clip is saved, so the original can go to the Recycle Bin.
   const deleteSource = useCallback(() => {
@@ -616,6 +669,11 @@ export default function App() {
         pickFile();
         return;
       }
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (!event.repeat) undo();
+        return;
+      }
       if (!current || event.ctrlKey || event.metaKey || event.altKey) return;
       // A focused button keeps its own Space/Enter.
       if (tag === 'BUTTON' && (event.key === ' ' || event.key === 'Enter')) return;
@@ -688,7 +746,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mouseup', dropFocus);
     };
-  }, [togglePlay, skipBy, toggleMute, wakeStage, seek, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
+  }, [togglePlay, skipBy, toggleMute, wakeStage, undo, seek, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
     const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
@@ -954,6 +1012,27 @@ export default function App() {
         </div>
         <AnimatePresence>
           {naming && <NameDialog key="name" stem={naming.stem} ext=".mp4" dir={naming.dir} onConfirm={confirmName} onCancel={cancelName} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key={toast.id}
+              className="toast"
+              role="status"
+              initial={{ opacity: 0, y: 12, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: 8, x: '-50%' }}
+              transition={{ duration: 0.18 }}
+            >
+              <span className="toast-text">{toast.text}</span>
+              {toast.canUndo && (
+                <button type="button" className="toast-action" onClick={undo}>
+                  {t.undo}
+                  <kbd>Ctrl+Z</kbd>
+                </button>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
       </MotionConfig>
     </I18nContext.Provider>

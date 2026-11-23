@@ -85,6 +85,7 @@ Clip Goat 针对这个过程设计：
 | `回车` | 导出 |
 | `Esc` | 取消导出 |
 | `Ctrl+O` | 打开视频 |
+| `Ctrl+Z` | 撤销上一次删除或重命名 |
 | 滚轮 | 缩放时间轨，按住 `Shift` 平移 |
 
 ## 命令行
@@ -257,6 +258,7 @@ Clips are saved next to the source video as `{original-name}_clip_{start}s-{end}
 | `Enter` | Export |
 | `Esc` | Cancel the export |
 | `Ctrl+O` | Open a video |
+| `Ctrl+Z` | Undo the last delete or rename |
 | Mouse wheel | Zoom the timeline; hold `Shift` to pan |
 
 ## Command line

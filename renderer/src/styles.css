@@ -785,6 +785,54 @@ button:disabled {
   opacity: 0.4;
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 45;
+  max-width: min(720px, calc(100vw - 48px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--menu);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1px var(--glass-edge);
+  font-size: 13px;
+}
+.toast-text {
+  min-width: 0;
+  padding: 4px 8px 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast-action {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 600;
+  transition: background-color 140ms var(--ease);
+}
+.toast-action:hover {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.toast-action kbd {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
 /* ---------- workspace ---------- */
 
 .workspace {
