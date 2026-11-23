@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { isClippedFile, buildClipName, uniquePath, planSegments, validateSegments, encodeOrigin, parseOrigin, lineage } from '../shared';
 
 test('isClippedFile looks only at the _clip_ marker in the file name', () => {
   assert.equal(isClippedFile('Game_20261122_1430_clip_112.5s-115.8s.mp4'), true);
-  assert.equal(isClippedFile('C:\\_clip_\\Game_20261122_1430.mp4'), false);
+  assert.equal(isClippedFile(path.join('videos', '_clip_', 'Game_20261122_1430.mp4')), false);
   assert.equal(isClippedFile('Game clip.mp4'), false);
 });
 
 test('buildClipName follows the template and trims decimals', () => {
-  assert.equal(buildClipName('D:\\v\\Game_20261122_1430.mp4', [{ start: 112.5, end: 115.8 }]), 'Game_20261122_1430_clip_112.5s-115.8s.mp4');
+  assert.equal(buildClipName(path.join('videos', 'Game_20261122_1430.mp4'), [{ start: 112.5, end: 115.8 }]), 'Game_20261122_1430_clip_112.5s-115.8s.mp4');
   assert.equal(
     buildClipName('a.b.mkv', [
       { start: 0, end: 3.004 },
@@ -78,6 +79,6 @@ test('lineage: a clip cut from a clip points back to the original video', () => 
     { start: 13, end: 14 },
     { start: 30, end: 32 },
   ]);
-  assert.deepEqual(lineage(null, 'D:\\v\\Game.mp4', [{ start: 1, end: 2 }]), { source: 'Game.mp4', segments: [{ start: 1, end: 2 }] });
+  assert.deepEqual(lineage(null, path.join('videos', 'Game.mp4'), [{ start: 1, end: 2 }]), { source: 'Game.mp4', segments: [{ start: 1, end: 2 }] });
   assert.equal(parseOrigin('some other comment'), null);
 });
