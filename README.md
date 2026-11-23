@@ -2,9 +2,13 @@
 
 <h1 align="center">Clip Goat</h1>
 
+<p align="center"><img src="assets/tagline.svg" width="420" alt="The GOAT of simply clipping" /></p>
+
 <p align="center"><a id="zh"></a>简体中文 | <a href="#en">English</a></p>
 
 Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron、React 和 TypeScript 构建，同时提供命令行。
+
+**下载**：在 [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) 页面获取 Windows 安装包。安装后可在应用内一键更新。
 
 ## 适用场景
 
@@ -16,12 +20,7 @@ Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游�
   <img src="docs/screenshot-20261122-230852.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
 </p>
 
-Clip Goat 针对这个过程设计：
-
-- 启动后直接显示"视频"文件夹及其子文件夹中的全部视频。
-- 截取一段视频中的十几秒。起点位于关键帧时不重新编码，画质与原片一致。
-- 每次导出后会询问是否把原片移到回收站；资源库里也会标出已经剪出过片段的原片，便于释放磁盘空间。
-- 截出的片段可以导出到指定文件夹，或在文件夹树中拖动归类。
+Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全部录像，截出需要的十几秒，再把原片移到回收站，把片段归到合适的文件夹。
 
 ## 为什么做 Clip Goat
 
@@ -33,12 +32,7 @@ Clip Goat 针对这个过程设计：
 
 > **Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后快速导出这两点之间的片段。**
 
-*其余的步骤都被省掉了：*
-
-- 没有工程、轨道和导出参数。打开视频，拖动两个手柄，按回车。
-- 能复制音视频流时就不重新编码，短片段的导出约 1 秒完成，画质没有损失。
-- 片段自动命名，保存在原片旁边。
-- 原片和片段显示在同一棵文件夹树里，已经剪出过片段的原片带有标记。
+*其余的步骤都被省掉了：不用新建工程，不用铺时间线，不用填导出参数，不用给文件起名。*
 
 它不能替代剪辑软件：没有转场、字幕、调色和多轨时间线。
 
@@ -54,7 +48,7 @@ Clip Goat 针对这个过程设计：
 - 🔊 **保留全部音轨**
 - 🎞️ **常见格式**：MP4、MKV、MOV、WebM、AVI、FLV 等
 - 📦 **内置 ffmpeg**：不需要另外安装
-- 🔄 **一键更新**：启动时自动检查新版本，也可以点标题栏的下载图标手动检查；确认后自动下载并安装
+- 🔄 **一键更新**：启动时自动检查新版本，也可以点标题栏的更新图标手动检查；确认后自动下载并安装
 - ⌨️ **命令行**：`clip-goat` 命令，与桌面应用共用裁切逻辑
 - 🌗 **界面**：深色和浅色主题，中文和英文
 
@@ -119,13 +113,14 @@ clip-goat -i Game.mp4 --segments 10-15,42.5-48
 clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
 ```
 
-## 安装
+## 已知限制
 
-从 [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) 页面下载 `Clip-Goat-Setup-x.y.z.exe` 并运行（Windows 10/11，64 位）。安装包没有代码签名，首次运行时 Windows 会显示 SmartScreen 提示，选择"更多信息 → 仍要运行"。
+- 流复制只能从关键帧开始，因此"秒出"的起点精度取决于视频的关键帧间隔。
+- 重新编码输出 8 位色的 H.264。HDR 视频重新编码后颜色会变淡，这类视频应使用流复制。
+- 预览画面与导出结果可能相差一帧，可变帧率的视频更明显。
+- 多段拼接时，每个接缝处会多出约 20 到 100 毫秒的画面，音画保持同步。
 
-0.2.0 及以后的版本可以在应用内更新，不需要重新下载安装包。0.1.0 没有这个功能，需要手动安装一次新版本。
-
-### 从源码构建
+## 开发
 
 构建环境要求 Node.js 20 或以上。
 
@@ -136,9 +131,7 @@ npm install
 npm run dist
 ```
 
-安装包生成在 `release` 文件夹中，文件名为 `Clip-Goat-Setup-x.y.z.exe`。
-
-只使用命令行时，执行 `npm install` 和 `npm run build` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
+安装包生成在 `release` 文件夹中。只使用命令行时，执行 `npm install` 和 `npm run build` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
 
 中国大陆的网络环境下，安装依赖前需要设置镜像：
 
@@ -147,22 +140,6 @@ $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 $env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
 $env:FFMPEG_BINARIES_URL="https://cdn.npmmirror.com/binaries/ffmpeg-static"
 npm install --registry=https://registry.npmmirror.com
-```
-
-## 已知限制
-
-- 流复制只能从关键帧开始，因此"秒出"的起点精度取决于视频的关键帧间隔。
-- 重新编码输出 8 位色的 H.264。HDR 视频重新编码后颜色会变淡，这类视频应使用流复制。
-- 预览画面与导出结果可能相差一帧，可变帧率的视频更明显。
-- 多段拼接时，每个接缝处会多出约 20 到 100 毫秒的画面，音画保持同步。
-
-## 开发
-
-```powershell
-npm run dev        # 开发模式，界面热更新，F12 打开开发者工具
-npm start          # 构建后启动
-npm test           # 运行单元测试
-npm run typecheck  # 类型检查
 ```
 
 | 目录 | 内容 |
@@ -188,6 +165,8 @@ npm run typecheck  # 类型检查
 
 Clip Goat is a lightweight and efficient tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron, React and TypeScript, and ships with a command-line interface.
 
+**Download**: get the Windows installer from the [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) page. Once installed, the app updates itself in one click.
+
 ## Use cases
 
 Clip Goat suits any situation where the video is long and the part you need is short: game replays, screen recordings, stream archives, security footage, and footage shot on a phone.
@@ -198,12 +177,7 @@ Game replays are a typical example. Features such as NVIDIA Instant Replay save 
   <img src="docs/screenshot-20261122-230852.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
 </p>
 
-Clip Goat is designed around this workflow:
-
-- On launch, it lists every video in your Videos folder and its subfolders.
-- It cuts a dozen seconds or so out of a video. When the start sits on a keyframe, nothing is re-encoded and the quality is identical to the original.
-- After each export it offers to move the original to the Recycle Bin, and originals that already have clips are marked in the library, so disk space is easy to reclaim.
-- Clips can be exported to a folder you choose, or dragged between folders in the tree.
+Clip Goat is designed around this workflow: it lists every recording in your Videos folder on launch, cuts out the dozen seconds you need, then moves the original to the Recycle Bin and files the clip in the folder where it belongs.
 
 ## Why Clip Goat
 
@@ -215,12 +189,7 @@ Cutting a dozen seconds out of a recording is a small job, but the usual ways of
 
 > **Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.**
 
-*Everything else is kept out of the way:*
-
-- There are no projects, tracks or export settings. You open a video, drag two handles and press Enter.
-- It copies the streams instead of re-encoding whenever it can, so a short clip exports in about a second and loses no quality.
-- The clip is named automatically and saved next to the original.
-- Originals and clips appear in one folder tree, and originals that already have clips are marked.
+*Everything else is left out: no project to create, no timeline to arrange, no export settings to fill in, no file name to think up.*
 
 It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.
 
@@ -236,7 +205,7 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 - 🔊 **All audio tracks kept**
 - 🎞️ **Common formats**: MP4, MKV, MOV, WebM, AVI, FLV and more
 - 📦 **Bundled ffmpeg**: no separate installation
-- 🔄 **One-click updates**: checks for a new version on launch, or on demand from the download icon in the title bar; downloads and installs it once you confirm
+- 🔄 **One-click updates**: checks for a new version on launch, or on demand from the update icon in the title bar; downloads and installs it once you confirm
 - ⌨️ **Command line**: the `clip-goat` command shares the cutting logic of the desktop app
 - 🌗 **Interface**: dark and light themes, English and Chinese
 
@@ -301,13 +270,14 @@ clip-goat -i Game.mp4 --segments 10-15,42.5-48
 clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
 ```
 
-## Installation
+## Known limitations
 
-Download `Clip-Goat-Setup-x.y.z.exe` from the [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) page and run it (Windows 10/11, 64-bit). The installer is not code-signed, so Windows shows a SmartScreen prompt the first time it runs; choose "More info → Run anyway".
+- Stream copy can only start on a keyframe, so the start precision of an "Instant" export depends on the keyframe interval of the video.
+- Re-encoding produces 8-bit H.264. HDR videos look washed out after re-encoding and should be exported with stream copy.
+- The preview and the exported result may differ by one frame, more noticeably with variable-frame-rate videos.
+- When ranges are joined, each seam gains about 20 to 100 ms of extra picture. Audio and video stay in sync.
 
-Version 0.2.0 and later update themselves from inside the app, so the installer does not have to be downloaded again. Version 0.1.0 does not have this and needs one manual install of a newer version.
-
-### Building from source
+## Development
 
 Building requires Node.js 20 or later.
 
@@ -318,9 +288,7 @@ npm install
 npm run dist
 ```
 
-The installer is written to the `release` folder as `Clip-Goat-Setup-x.y.z.exe`.
-
-To use only the command line, run `npm install` and `npm run build`, then `npm link`. The `clip-goat` command is then available in any directory.
+The installer is written to the `release` folder. To use only the command line, run `npm install` and `npm run build`, then `npm link`; the `clip-goat` command is then available in any directory.
 
 On networks in mainland China, set these mirrors before installing the dependencies:
 
@@ -329,22 +297,6 @@ $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 $env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
 $env:FFMPEG_BINARIES_URL="https://cdn.npmmirror.com/binaries/ffmpeg-static"
 npm install --registry=https://registry.npmmirror.com
-```
-
-## Known limitations
-
-- Stream copy can only start on a keyframe, so the start precision of an "Instant" export depends on the keyframe interval of the video.
-- Re-encoding produces 8-bit H.264. HDR videos look washed out after re-encoding and should be exported with stream copy.
-- The preview and the exported result may differ by one frame, more noticeably with variable-frame-rate videos.
-- When ranges are joined, each seam gains about 20 to 100 ms of extra picture. Audio and video stay in sync.
-
-## Development
-
-```powershell
-npm run dev        # development mode with hot reload; F12 opens the developer tools
-npm start          # build, then launch
-npm test           # run the unit tests
-npm run typecheck  # type-check the whole project
 ```
 
 | Directory | Contents |
