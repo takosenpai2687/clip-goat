@@ -1,6 +1,6 @@
 {
   "name": "clip-goat",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Minimal video trimmer: pick a start and an end, export in seconds. Electron app + Node CLI sharing one ffmpeg core.",
   "author": "takosenpai2687",
   "license": "GPL-3.0-or-later",
