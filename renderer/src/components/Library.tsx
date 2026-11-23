@@ -90,6 +90,23 @@ function MidName({ text, className }: { text: string; className?: string }) {
   );
 }
 
+// The videos of the folder that holds a file, in the order the library lists them.
+export function siblingsOf(trees: LibraryDir[], filePath: string): LibraryFile[] {
+  const find = (node: LibraryDir): LibraryDir | null => {
+    if (node.files.some((f) => f.path === filePath)) return node;
+    for (const dir of node.dirs) {
+      const hit = find(dir);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const tree of trees) {
+    const dir = find(tree);
+    if (dir) return grouped(dir.files).map((row) => row.file);
+  }
+  return [];
+}
+
 // Puts each clip right under the original it was cut from. When the original is gone, its clips stay
 // together with the first one as the head of the group. Groups are ordered by the original's name, so
 // clips keep their place in the folder when their original is deleted.

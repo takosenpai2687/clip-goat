@@ -3,10 +3,11 @@ import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Maximize2, Pause, Play, Plus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import TitleBar from './components/TitleBar';
-import Library, { type Filter } from './components/Library';
+import Library, { siblingsOf, type Filter } from './components/Library';
 import Backdrop from './components/Backdrop';
 import NameDialog from './components/NameDialog';
 import StageControls, { RATE_CHOICES, SKIP_CHOICES } from './components/StageControls';
+import StageProgress from './components/StageProgress';
 import Timeline from './components/Timeline';
 import ExportBar, { type ExportState } from './components/ExportBar';
 import { I18nContext, STRINGS, defaultLang, errorText, type Lang, type Strings } from './lib/i18n';
@@ -468,6 +469,15 @@ export default function App() {
     if (current && state.status === 'done') trashFile(current.path);
   }, [trashFile]);
 
+  // Previous and next video of the open one's folder, in library order.
+  const docPath = doc ? doc.path : null;
+  const neighbours = useMemo(() => {
+    const list = docPath ? siblingsOf(trees, docPath) : [];
+    const at = list.findIndex((f) => f.path === docPath);
+    const pick = (i: number) => (at >= 0 && list[i] ? { path: list[i].path, name: list[i].name } : null);
+    return { prev: pick(at - 1), next: pick(at + 1) };
+  }, [trees, docPath]);
+
   /* ---------- playback ---------- */
 
   const seek = useCallback((target: number) => {
@@ -926,7 +936,6 @@ export default function App() {
             onLang={toggleLang}
             onSidebar={toggleSidebar}
             sidebarOpen={sidebarOpen}
-            onOpenFile={pickFile}
             onCheckUpdate={checkUpdateNow}
             platform={api.platform}
           />
@@ -999,6 +1008,8 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
+                {doc && load.status === 'ready' && <StageProgress visible={stageHot && !locked} time={time} duration={duration} onSeek={seek} />}
+
                 {doc && load.status === 'ready' && (
                   <StageControls
                     visible={stageHot && !locked}
@@ -1013,6 +1024,9 @@ export default function App() {
                     onMute={toggleMute}
                     rate={rate}
                     onRate={setRate}
+                    prev={neighbours.prev}
+                    next={neighbours.next}
+                    onOpen={openFile}
                   />
                 )}
 

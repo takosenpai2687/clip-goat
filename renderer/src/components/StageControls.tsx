@@ -1,6 +1,6 @@
 import { memo, useState, type MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Pause, Play, RotateCcw, RotateCw, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react';
 import Menu, { type MenuState } from './Menu';
 import { useT } from '../lib/i18n';
 
@@ -10,7 +10,12 @@ export const RATE_CHOICES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.16 } };
 
 // Controls that float over the picture while the pointer is on it:
-// play/pause and skip in the middle, volume and speed in the bottom-left corner.
+// play/pause and skip in the middle; previous/next video, speed and volume in the bottom-left corner.
+export interface Neighbour {
+  path: string;
+  name: string;
+}
+
 interface StageControlsProps {
   visible: boolean;
   playing: boolean;
@@ -24,9 +29,12 @@ interface StageControlsProps {
   onMute: () => void;
   rate: number;
   onRate: (rate: number) => void;
+  prev: Neighbour | null;
+  next: Neighbour | null;
+  onOpen: (path: string) => void;
 }
 
-function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate }: StageControlsProps) {
+function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate, prev, next, onOpen }: StageControlsProps) {
   const t = useT();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const silent = muted || volume === 0;
@@ -63,6 +71,19 @@ function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange,
     </button>
   );
 
+  const hop = (target: Neighbour | null, label: string, back: boolean) => (
+    <button
+      type="button"
+      className="corner-button"
+      disabled={!target}
+      onClick={() => target && onOpen(target.path)}
+      aria-label={label}
+      title={target ? `${label}\n${target.name}` : label}
+    >
+      {back ? <SkipBack size={15} strokeWidth={1.5} /> : <SkipForward size={15} strokeWidth={1.5} />}
+    </button>
+  );
+
   return (
     <>
       <AnimatePresence>
@@ -96,6 +117,10 @@ function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange,
 
         {(visible || menu) && (
           <motion.div key="corner" className="stage-corner" {...fade}>
+            <div className="volume">
+              {hop(prev, t.prevVideo, true)}
+              {hop(next, t.nextVideo, false)}
+            </div>
             <button
               type="button"
               className={`corner-button is-rate num${rate !== 1 ? ' is-changed' : ''}`}

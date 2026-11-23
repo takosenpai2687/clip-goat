@@ -933,7 +933,7 @@ button:disabled {
 .stage-corner {
   position: absolute;
   left: 14px;
-  bottom: 14px;
+  bottom: 22px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -959,6 +959,56 @@ button:disabled {
 }
 .corner-button:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+.corner-button:disabled {
+  color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  cursor: default;
+}
+
+/* Progress along the bottom edge of the picture. The hit area is taller than the bar. */
+.stage-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16px;
+  cursor: pointer;
+  touch-action: none;
+}
+.stage-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: height 140ms var(--ease);
+}
+.stage-progress:hover .stage-progress-track,
+.stage-progress.is-dragging .stage-progress-track {
+  height: 6px;
+}
+.stage-progress-fill {
+  width: var(--at);
+  height: 100%;
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 15%, transparent), var(--accent)); /* taste-skill-ignore: the user asked for a fading progress bar */
+}
+.stage-progress-thumb {
+  position: absolute;
+  left: var(--at);
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: scale(0);
+  transition: transform 140ms var(--ease);
+}
+.stage-progress:hover .stage-progress-thumb,
+.stage-progress.is-dragging .stage-progress-thumb {
+  transform: scale(1);
 }
 .corner-button.is-rate {
   padding: 0 12px;
