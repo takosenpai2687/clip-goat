@@ -44,22 +44,22 @@ export interface ClipLabel {
   tail: string;
 }
 
-export interface LibraryFile {
+export interface WorkspaceFile {
   name: string;
   path: string;
   size: number;
   mtime: number;
   clipped: boolean;
   label: ClipLabel;
-  /** Originals only: how many clips in the library were cut from this video. */
+  /** Originals only: how many clips in the workspace were cut from this video. */
   clips?: number;
 }
 
-export interface LibraryDir {
+export interface WorkspaceDir {
   path: string;
   name: string;
-  dirs: LibraryDir[];
-  files: LibraryFile[];
+  dirs: WorkspaceDir[];
+  files: WorkspaceFile[];
   total: number;
   missing?: boolean;
 }
@@ -99,7 +99,7 @@ export interface UpdateInfo {
 export interface ApiEvents {
   'export:progress': ClipProgress;
   'media:proxy-progress': { path: string; percent: number };
-  'library:changed': undefined;
+  'workspace:changed': undefined;
   'app:open-file': string;
   'update:progress': { percent: number };
 }
@@ -110,7 +110,7 @@ export interface ClipGoatApi {
   pathForFile(file: File): string;
   openFile(): Promise<string | null>;
   openFolder(): Promise<string | null>;
-  scan(roots: string[], hidden: string[]): Promise<LibraryDir[]>;
+  scan(roots: string[], hidden: string[]): Promise<WorkspaceDir[]>;
   defaultRoot(): Promise<string>;
   moveFile(src: string, destDir: string): Promise<string>;
   renameFile(src: string, stem: string): Promise<string>;

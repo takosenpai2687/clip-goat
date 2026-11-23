@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { ApiEvents, ClipGoatApi } from '../shared/types';
 
-const EVENTS: (keyof ApiEvents)[] = ['export:progress', 'media:proxy-progress', 'library:changed', 'app:open-file', 'update:progress'];
+const EVENTS: (keyof ApiEvents)[] = ['export:progress', 'media:proxy-progress', 'workspace:changed', 'app:open-file', 'update:progress'];
 
 interface Reply<T> {
   ok: boolean;
@@ -20,8 +20,8 @@ const api: ClipGoatApi = {
   pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: () => call('dialog:openFile'),
   openFolder: () => call('dialog:openFolder'),
-  scan: (roots, hidden) => call('library:scan', roots, hidden),
-  defaultRoot: () => call('library:defaultRoot'),
+  scan: (roots, hidden) => call('workspace:scan', roots, hidden),
+  defaultRoot: () => call('workspace:defaultRoot'),
   moveFile: (src, destDir) => call('fs:move', src, destDir),
   renameFile: (src, stem) => call('fs:rename', src, stem),
   trashFile: (filePath) => call('fs:trash', filePath),

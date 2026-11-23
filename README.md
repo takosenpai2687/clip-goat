@@ -43,7 +43,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 - 🎯 **精确到帧**：起点不在关键帧上时自动重新编码
 - 🧩 **多段拼接**：多个片段合并为一个文件
 - 🔁 **片段可以再剪**：来源记录在文件元数据里，原视频删除后仍可继续剪
-- 🗂️ **资源库**：文件夹树，片段排在所属原片下方，支持搜索、移动、重命名和删除
+- 🗂️ **工作区**：文件夹树，片段排在所属原片下方，支持搜索、移动、重命名和删除
 - 🗑️ **释放空间**：导出后可一键把原视频移到回收站
 - 🔊 **保留全部音轨**
 - 🎞️ **常见格式**：MP4、MKV、MOV、WebM、AVI、FLV 等
@@ -54,7 +54,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 
 ## 使用
 
-1. **打开**：把视频拖进窗口，或在左侧资源库里点击。
+1. **打开**：把视频拖进窗口，或在左侧工作区里点击。
 2. **选取**：拖动时间轨两端的手柄。
 3. **导出**：按回车，确认文件名后再按一次回车。
 4. **清理**（可选）：导出后点"删除原视频"，把原片移到回收站。
@@ -146,7 +146,7 @@ npm install --registry=https://registry.npmmirror.com
 |---|---|
 | `shared/` | 裁切、视频信息读取、文件命名，桌面应用和命令行共用 |
 | `cli/` | 命令行入口 |
-| `electron/` | 主进程：窗口、本地视频读取、资源库、导出任务、自动更新 |
+| `electron/` | 主进程：窗口、本地视频读取、工作区、导出任务、自动更新 |
 | `renderer/` | 界面，React + Vite |
 | `dist/` | TypeScript 编译产物（不入库） |
 | `assets/` | 图标和标志 |
@@ -200,7 +200,7 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 - 🎯 **Frame-exact cuts**: re-encodes automatically when the start is not on a keyframe
 - 🧩 **Joining ranges**: several ranges merged into one file
 - 🔁 **Clips of clips**: the source is recorded in the file metadata, so clips can be cut again even after the original is deleted
-- 🗂️ **Library**: a folder tree with clips listed under the video they came from; search, move, rename and delete
+- 🗂️ **Workspace**: a folder tree with clips listed under the video they came from; search, move, rename and delete
 - 🗑️ **Free up space**: move the original to the Recycle Bin in one click after an export
 - 🔊 **All audio tracks kept**
 - 🎞️ **Common formats**: MP4, MKV, MOV, WebM, AVI, FLV and more
@@ -211,7 +211,7 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 
 ## Usage
 
-1. **Open**: drop a video onto the window, or click one in the library on the left.
+1. **Open**: drop a video onto the window, or click one in the workspace on the left.
 2. **Select**: drag the handles at either end of the timeline.
 3. **Export**: press Enter, confirm the file name, and press Enter again.
 4. **Clean up** (optional): after the export, click "Delete original" to move the original to the Recycle Bin.
@@ -303,7 +303,7 @@ npm install --registry=https://registry.npmmirror.com
 |---|---|
 | `shared/` | Cutting, video probing and file naming, shared by the desktop app and the command line |
 | `cli/` | Command-line entry point |
-| `electron/` | Main process: window, local video access, library, export jobs, updates |
+| `electron/` | Main process: window, local video access, workspace, export jobs, updates |
 | `renderer/` | Interface, React + Vite |
 | `dist/` | Compiled TypeScript output (not committed) |
 | `assets/` | Icons and logo |

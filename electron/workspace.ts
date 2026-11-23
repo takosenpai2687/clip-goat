@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as shared from '../shared';
-import type { LibraryDir, LibraryFile } from '../shared';
+import type { WorkspaceDir, WorkspaceFile } from '../shared';
 
 const SKIP_DIRS = new Set(['node_modules', '$RECYCLE.BIN', 'System Volume Information']);
 const MAX_DEPTH = 8;
@@ -15,15 +15,15 @@ function fail(message: string, code: string): never {
 const byName = (a: { name: string }, b: { name: string }): number => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 
 // Returns a folder node, or null when the folder holds no video anywhere below it.
-async function scanDir(dir: string, depth: number, budget: { left: number }, hidden: Set<string>): Promise<LibraryDir | null> {
+async function scanDir(dir: string, depth: number, budget: { left: number }, hidden: Set<string>): Promise<WorkspaceDir | null> {
   let entries: fs.Dirent[];
   try {
     entries = await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
     return null;
   }
-  const files: LibraryFile[] = [];
-  const dirs: LibraryDir[] = [];
+  const files: WorkspaceFile[] = [];
+  const dirs: WorkspaceDir[] = [];
   for (const entry of entries) {
     if (budget.left-- <= 0) break;
     if (entry.name.startsWith('.')) continue;
@@ -58,17 +58,17 @@ async function scanDir(dir: string, depth: number, budget: { left: number }, hid
   };
 }
 
-function eachFile(node: LibraryDir, fn: (file: LibraryFile) => void): void {
+function eachFile(node: WorkspaceDir, fn: (file: WorkspaceFile) => void): void {
   node.files.forEach(fn);
   node.dirs.forEach((d) => eachFile(d, fn));
 }
 
-// One tree per root. Folders in hiddenDirs were removed from the library by the user and are skipped.
-// Each original gets clips: how many clips anywhere in the library were cut from it.
-export async function scanLibrary(roots: string[], hiddenDirs: string[] = []): Promise<LibraryDir[]> {
+// One tree per root. Folders in hiddenDirs were removed from the workspace by the user and are skipped.
+// Each original gets clips: how many clips anywhere in the workspace were cut from it.
+export async function scanWorkspace(roots: string[], hiddenDirs: string[] = []): Promise<WorkspaceDir[]> {
   const budget = { left: MAX_ENTRIES };
   const hidden = new Set(hiddenDirs.map((dir) => dir.toLowerCase()));
-  const trees: LibraryDir[] = [];
+  const trees: WorkspaceDir[] = [];
   for (const root of roots) {
     const node = await scanDir(root, 0, budget, hidden);
     trees.push(node || { path: root, name: path.basename(root) || root, dirs: [], files: [], total: 0, missing: true });
@@ -178,13 +178,13 @@ export async function restoreFile(original: string): Promise<string> {
   return original;
 }
 
-export interface LibraryWatcher {
+export interface WorkspaceWatcher {
   set(roots: string[]): void;
   close(): void;
 }
 
 // Watches every root recursively and reports changes once things settle.
-export function createWatcher(onChange: () => void): LibraryWatcher {
+export function createWatcher(onChange: () => void): WorkspaceWatcher {
   let watchers: fs.FSWatcher[] = [];
   let timer: NodeJS.Timeout | undefined;
   return {

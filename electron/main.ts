@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import * as shared from '../shared';
 import type { ApiEvents, ExportJob, ExportPlan, MediaDoc, Origin, ProxyLevel, Segment, Theme } from '../shared';
-import * as library from './library';
+import * as workspace from './workspace';
 import { createUpdater } from './updater';
 
 // Compiled to dist/electron, so the project root sits two folders up.
@@ -106,7 +106,7 @@ function handle(channel: string, fn: (...args: any[]) => unknown): void {
   });
 }
 
-const watcher = library.createWatcher(() => send('library:changed'));
+const watcher = workspace.createWatcher(() => send('workspace:changed'));
 const updater = createUpdater((percent) => send('update:progress', { percent }));
 
 async function getKeyframes(filePath: string, startTime: number): Promise<number[]> {
@@ -143,18 +143,18 @@ function registerIpc(): void {
     return res.canceled ? null : res.filePaths[0];
   });
 
-  handle('library:scan', async (roots: string[], hidden?: string[]) => {
-    const trees = await library.scanLibrary(roots, hidden || []);
+  handle('workspace:scan', async (roots: string[], hidden?: string[]) => {
+    const trees = await workspace.scanWorkspace(roots, hidden || []);
     watcher.set(roots.filter((root) => fs.existsSync(root)));
     return trees;
   });
 
-  handle('library:defaultRoot', () => app.getPath('videos'));
-  handle('fs:move', (src: string, destDir: string) => library.moveFile(src, destDir));
-  handle('fs:rename', (src: string, stem: string) => library.renameFile(src, stem));
-  handle('fs:restore', (filePath: string) => library.restoreFile(filePath));
+  handle('workspace:defaultRoot', () => app.getPath('videos'));
+  handle('fs:move', (src: string, destDir: string) => workspace.moveFile(src, destDir));
+  handle('fs:rename', (src: string, stem: string) => workspace.renameFile(src, stem));
+  handle('fs:restore', (filePath: string) => workspace.restoreFile(filePath));
   handle('fs:trash', async (filePath: string) => {
-    library.assertVideo(filePath);
+    workspace.assertVideo(filePath);
     await shell.trashItem(filePath);
   });
 

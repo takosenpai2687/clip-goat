@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Maximize2, Pause, Play, Plus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import TitleBar from './components/TitleBar';
-import Library, { siblingsOf, type Filter } from './components/Library';
+import Workspace, { siblingsOf, type Filter } from './components/Workspace';
 import Backdrop from './components/Backdrop';
 import NameDialog from './components/NameDialog';
 import StageControls, { RATE_CHOICES, SKIP_CHOICES } from './components/StageControls';
@@ -13,7 +13,7 @@ import ExportBar, { type ExportState } from './components/ExportBar';
 import { I18nContext, STRINGS, defaultLang, errorText, type Lang, type Strings } from './lib/i18n';
 import { clamp, formatTime } from './lib/format';
 import { addAt, makeSegment, moveEdge, snapStarts, totalLength, type Edge, type Range } from './lib/segments';
-import type { ExportPlan, LibraryDir, MediaDoc, ProxyLevel, Segment, Theme } from '../../shared/types';
+import type { ExportPlan, WorkspaceDir, MediaDoc, ProxyLevel, Segment, Theme } from '../../shared/types';
 
 /** How the preview is fed: the file itself, or a proxy built from it. */
 type Level = 'direct' | ProxyLevel;
@@ -78,6 +78,10 @@ const PLAYABLE_CODECS = ['h264', 'hevc', 'vp8', 'vp9', 'av1'];
 const PLAYABLE_EXTS = ['mp4', 'm4v', 'mov', 'webm', 'mkv'];
 const IDLE: ExportState = { status: 'idle', percent: 0 };
 
+const SIDEBAR_DEFAULT = 300;
+const SIDEBAR_MIN = 240;
+const SIDEBAR_MAX = 720;
+
 const stored = (key: string, fallback: string): string => localStorage.getItem(key) ?? fallback;
 const storedJson = <T,>(key: string, fallback: T): T => {
   try {
@@ -108,13 +112,16 @@ export default function App() {
   const [lang, setLang] = useState<Lang>(() => (stored('lang', defaultLang()) === 'zh' ? 'zh' : 'en'));
   const [theme, setTheme] = useState<Theme>(() => (stored('theme', 'dark') === 'light' ? 'light' : 'dark'));
   const [sidebarOpen, setSidebarOpen] = useState(() => stored('sidebar', '1') === '1');
+  const [sidebarWidth, setSidebarWidth] = useState(() => clamp(Number(stored('sidebarWidth', '')) || SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX));
+  const [resizing, setResizing] = useState(false);
+  const resizeFrom = useRef<{ x: number; width: number } | null>(null);
   // roots is null until the first run has picked the system Videos folder.
   const [roots, setRoots] = useState<string[] | null>(() => storedJson<string[] | null>('roots', null));
   const [tempRoots, setTempRoots] = useState<string[]>([]);
-  const [trees, setTrees] = useState<LibraryDir[]>([]);
+  const [trees, setTrees] = useState<WorkspaceDir[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(storedJson<string[]>('expanded', [])));
   const [filter, setFilter] = useState<Filter>('all');
-  // Subfolders the user removed from the library; they are skipped until added back.
+  // Subfolders the user removed from the workspace; they are skipped until added back.
   const [hidden, setHidden] = useState<string[]>(() => storedJson<string[]>('hidden', []));
   const [dest, setDest] = useState<string | null>(() => stored('dest', '') || null);
   const [notice, setNotice] = useState('');
@@ -163,7 +170,7 @@ export default function App() {
   const minLen = Math.max(0.05, 1 / fps);
   const locked = exp.status === 'running';
 
-  /* ---------- library ---------- */
+  /* ---------- workspace ---------- */
 
   const rescan = useCallback(async () => {
     const all = allRoots(live.current.roots, live.current.tempRoots);
@@ -283,7 +290,7 @@ export default function App() {
   const addRoot = useCallback(async () => {
     const dir = await api.openFolder();
     if (!dir) return;
-    // A folder that already sits inside the library is shown in its place in the tree, not as a second root.
+    // A folder that already sits inside the workspace is shown in its place in the tree, not as a second root.
     const { roots: saved, tempRoots: temp } = live.current;
     if (allRoots(saved, temp).some((r) => isInside(dir, r))) {
       reveal(dir);
@@ -469,7 +476,7 @@ export default function App() {
     if (current && state.status === 'done') trashFile(current.path);
   }, [trashFile]);
 
-  // Previous and next video of the open one's folder, in library order.
+  // Previous and next video of the open one's folder, in workspace order.
   const docPath = doc ? doc.path : null;
   const neighbours = useMemo(() => {
     const list = docPath ? siblingsOf(trees, docPath) : [];
@@ -723,7 +730,7 @@ export default function App() {
     const offProxy = api.on('media:proxy-progress', (p) =>
       setLoad((prev) => (prev.status === 'loading' ? { ...prev, percent: p.percent } : prev)),
     );
-    const offChanged = api.on('library:changed', rescan);
+    const offChanged = api.on('workspace:changed', rescan);
     const offOpen = api.on('app:open-file', (filePath) => openFile(filePath));
 
     api.initialFile().then((filePath) => {
@@ -737,7 +744,7 @@ export default function App() {
     };
   }, [openFile, rescan]);
 
-  // First run: start the library with the system Videos folder.
+  // First run: start the workspace with the system Videos folder.
   useEffect(() => {
     if (roots !== null) return;
     api.defaultRoot().then((dir) => {
@@ -790,6 +797,25 @@ export default function App() {
   }, [lang]);
 
   useEffect(() => localStorage.setItem('sidebar', sidebarOpen ? '1' : '0'), [sidebarOpen]);
+  useEffect(() => localStorage.setItem('sidebarWidth', String(sidebarWidth)), [sidebarWidth]);
+
+  // The sidebar's right edge can be dragged; the picture always keeps a usable width.
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeFrom.current = { x: event.clientX, width: sidebarWidth };
+    setResizing(true);
+  };
+  const moveResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const from = resizeFrom.current;
+    if (!from) return;
+    const max = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, window.innerWidth - 480));
+    setSidebarWidth(Math.round(clamp(from.width + event.clientX - from.x, SIDEBAR_MIN, max)));
+  };
+  const endResize = () => {
+    resizeFrom.current = null;
+    setResizing(false);
+  };
 
   const toggleTheme = useCallback(() => {
     const flip = () => flushSync(() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')));
@@ -948,11 +974,12 @@ export default function App() {
                   className={`sidebar-slot${locked ? ' is-locked' : ''}`}
                   inert={locked}
                   initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 312, opacity: 1 }}
+                  animate={{ width: sidebarWidth + 12, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 40 }}
+                  transition={resizing ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 40 }}
+                  style={{ '--sidebar-w': `${sidebarWidth}px` }}
                 >
-                  <Library
+                  <Workspace
                     trees={trees}
                     expanded={expanded}
                     onToggle={toggleDir}
@@ -972,11 +999,23 @@ export default function App() {
                     notice={notice}
                     lang={lang}
                   />
+                  <div
+                    className={`sidebar-resizer${resizing ? ' is-active' : ''}`}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={t.resizeSidebar}
+                    title={t.resizeSidebar}
+                    onPointerDown={startResize}
+                    onPointerMove={moveResize}
+                    onPointerUp={endResize}
+                    onPointerCancel={endResize}
+                    onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <main className="workspace">
+            <main className="main-area">
               <section
                 className={`stage${doc ? '' : ' is-empty glass'}${dropping ? ' is-dropping' : ''}`}
                 onPointerMove={wakeStage}

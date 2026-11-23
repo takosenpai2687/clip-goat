@@ -4,13 +4,13 @@ import { ChevronRight, Ellipsis, FolderPlus, Scissors, Search, X } from 'lucide-
 import Menu, { type MenuItem, type MenuState } from './Menu';
 import { formatDay, formatSize } from '../lib/format';
 import { useT, type Lang } from '../lib/i18n';
-import type { LibraryDir, LibraryFile } from '../../../shared/types';
+import type { WorkspaceDir, WorkspaceFile } from '../../../shared/types';
 
 export type Filter = 'all' | 'originals' | 'clips';
 
 interface DirRow {
   type: 'dir';
-  node: LibraryDir;
+  node: WorkspaceDir;
   depth: number;
   isRoot: boolean;
   /** Videos under this folder that pass the current filter. */
@@ -20,7 +20,7 @@ interface DirRow {
 
 interface FileRow {
   type: 'file';
-  file: LibraryFile;
+  file: WorkspaceFile;
   /** Listed under another video of the same source, joined to it by a branch line. */
   child: boolean;
   last?: boolean;
@@ -31,7 +31,7 @@ interface FileRow {
 type Row = DirRow | FileRow;
 
 interface GroupedFile {
-  file: LibraryFile;
+  file: WorkspaceFile;
   child: boolean;
   last?: boolean;
 }
@@ -41,13 +41,13 @@ const DRAG_TYPE = 'application/x-clipgoat-path';
 
 // Turns the folder trees into the list of rows currently on screen.
 // While filtering or searching, folders with no match are hidden and matching folders open themselves.
-function flatten(trees: LibraryDir[], expanded: Set<string>, filter: Filter, query: string): Row[] {
+function flatten(trees: WorkspaceDir[], expanded: Set<string>, filter: Filter, query: string): Row[] {
   const q = query.trim().toLowerCase();
   const narrowed = filter !== 'all' || q !== '';
-  const matches = (f: LibraryFile): boolean => (filter === 'all' || (filter === 'clips') === f.clipped) && (!q || f.name.toLowerCase().includes(q));
+  const matches = (f: WorkspaceFile): boolean => (filter === 'all' || (filter === 'clips') === f.clipped) && (!q || f.name.toLowerCase().includes(q));
   const rows: Row[] = [];
 
-  const visit = (node: LibraryDir, depth: number, isRoot: boolean, ancestors: string[] = []): number => {
+  const visit = (node: WorkspaceDir, depth: number, isRoot: boolean, ancestors: string[] = []): number => {
     const names = [node.name, ...ancestors];
     const files = node.files.filter(matches);
     const row: DirRow = { type: 'dir', node, depth, isRoot, count: files.length, open: q ? true : expanded.has(node.path) };
@@ -56,7 +56,7 @@ function flatten(trees: LibraryDir[], expanded: Set<string>, filter: Filter, que
     for (const dir of node.dirs) row.count += visit(dir, depth + 1, false, names);
     if (row.open) {
       for (const { file, child, last } of grouped(files)) {
-        rows.push({ type: 'file', file, child, last, depth: depth + (child ? 2 : 1), shown: file.clipped ? file.name : shortName(file.name, names) });
+        rows.push({ type: 'file', file, child, last, depth: depth + (child ? 2 : 1), shown: shortName(file.name, names) });
       }
     } else {
       rows.length = childStart;
@@ -90,9 +90,9 @@ function MidName({ text, className }: { text: string; className?: string }) {
   );
 }
 
-// The videos of the folder that holds a file, in the order the library lists them.
-export function siblingsOf(trees: LibraryDir[], filePath: string): LibraryFile[] {
-  const find = (node: LibraryDir): LibraryDir | null => {
+// The videos of the folder that holds a file, in the order the workspace lists them.
+export function siblingsOf(trees: WorkspaceDir[], filePath: string): WorkspaceFile[] {
+  const find = (node: WorkspaceDir): WorkspaceDir | null => {
     if (node.files.some((f) => f.path === filePath)) return node;
     for (const dir of node.dirs) {
       const hit = find(dir);
@@ -110,9 +110,9 @@ export function siblingsOf(trees: LibraryDir[], filePath: string): LibraryFile[]
 // Puts each clip right under the original it was cut from. When the original is gone, its clips stay
 // together with the first one as the head of the group. Groups are ordered by the original's name, so
 // clips keep their place in the folder when their original is deleted.
-function grouped(files: LibraryFile[]): GroupedFile[] {
-  const stem = (f: LibraryFile): string => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
-  const byHead = new Map<string, LibraryFile[]>();
+function grouped(files: WorkspaceFile[]): GroupedFile[] {
+  const stem = (f: WorkspaceFile): string => f.name.slice(0, f.name.lastIndexOf('.')).toLowerCase();
+  const byHead = new Map<string, WorkspaceFile[]>();
   for (const f of files) {
     if (!f.clipped) continue;
     const key = f.label.head.toLowerCase();
@@ -141,10 +141,10 @@ function grouped(files: LibraryFile[]): GroupedFile[] {
     .flatMap((group) => group.rows);
 }
 
-function tally(trees: LibraryDir[]): { originals: number; clips: number } {
+function tally(trees: WorkspaceDir[]): { originals: number; clips: number } {
   let originals = 0;
   let clips = 0;
-  const walk = (node: LibraryDir): void => {
+  const walk = (node: WorkspaceDir): void => {
     for (const f of node.files) {
       if (f.clipped) clips++;
       else originals++;
@@ -155,8 +155,8 @@ function tally(trees: LibraryDir[]): { originals: number; clips: number } {
   return { originals, clips };
 }
 
-interface LibraryProps {
-  trees: LibraryDir[];
+interface WorkspaceProps {
+  trees: WorkspaceDir[];
   expanded: Set<string>;
   onToggle: (dir: string) => void;
   filter: Filter;
@@ -176,7 +176,7 @@ interface LibraryProps {
   lang: Lang;
 }
 
-function Library({
+function Workspace({
   trees,
   expanded,
   onToggle,
@@ -195,7 +195,7 @@ function Library({
   onSetDest,
   notice,
   lang,
-}: LibraryProps) {
+}: WorkspaceProps) {
   const t = useT();
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -223,7 +223,7 @@ function Library({
     setMenu({ x: fromButton ? rect.left : event.clientX, y: fromButton ? rect.bottom + 4 : event.clientY, items });
   };
 
-  const fileItems = (file: LibraryFile): MenuItem[] => [
+  const fileItems = (file: WorkspaceFile): MenuItem[] => [
     { label: t.rename, onSelect: () => setEditing(file.path) },
     { label: t.reveal, onSelect: () => onShow(file.path) },
     { label: t.trash, confirm: t.trashConfirm, danger: true, onSelect: () => onTrash(file.path) },
@@ -234,7 +234,7 @@ function Library({
     { label: t.removeRoot, onSelect: () => (row.isRoot ? onRemoveRoot(row.node.path) : onHideDir(row.node.path)) },
   ];
 
-  const commitRename = (file: LibraryFile, value: string) => {
+  const commitRename = (file: WorkspaceFile, value: string) => {
     setEditing(null);
     const stem = value.trim();
     const ext = file.name.slice(file.name.lastIndexOf('.'));
@@ -258,7 +258,7 @@ function Library({
   return (
     <aside className="sidebar glass">
       <div className="sidebar-head">
-        <h2 className="sidebar-title">{t.library}</h2>
+        <h2 className="sidebar-title">{t.workspace}</h2>
         <button type="button" className="icon-button" onClick={onAddRoot} aria-label={t.addFolder} title={t.addFolder}>
           <FolderPlus size={16} strokeWidth={1.5} />
         </button>
@@ -286,7 +286,7 @@ function Library({
       </div>
 
       <div className="tree" role="tree" onDragLeave={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && setDropTarget(null)}>
-        {trees.length === 0 && <p className="empty-note">{t.emptyLibrary}</p>}
+        {trees.length === 0 && <p className="empty-note">{t.emptyWorkspace}</p>}
 
         {rows.map((row) => {
           const indent = { paddingLeft: 8 + row.depth * 14 };
@@ -398,4 +398,4 @@ function Library({
   );
 }
 
-export default memo(Library);
+export default memo(Workspace);
