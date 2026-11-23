@@ -71,8 +71,8 @@ export default function App() {
   const [exp, setExp] = useState(IDLE);
   const [dropping, setDropping] = useState(false);
   const [skip, setSkip] = useState(() => {
-    const saved = Number(stored('skip', 10));
-    return SKIP_CHOICES.includes(saved) ? saved : 10;
+    const saved = Number(stored('skipSeconds', 5));
+    return SKIP_CHOICES.includes(saved) ? saved : 5;
   });
   const [volume, setVolume] = useState(() => clamp(Number(stored('volume', 1)) || 0, 0, 1));
   const [muted, setMuted] = useState(() => stored('muted', '0') === '1');
@@ -637,7 +637,7 @@ export default function App() {
 
   useEffect(() => localStorage.setItem('expanded', JSON.stringify([...expanded])), [expanded]);
   useEffect(() => localStorage.setItem('dest', dest || ''), [dest]);
-  useEffect(() => localStorage.setItem('skip', String(skip)), [skip]);
+  useEffect(() => localStorage.setItem('skipSeconds', String(skip)), [skip]);
 
   // Volume and speed belong to the preview only; exports are never affected.
   useEffect(() => {

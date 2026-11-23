@@ -78,7 +78,7 @@ Clip Goat 针对这个过程设计：
 | `I` / `O` | 将起点 / 终点设为当前位置 |
 | `M` | 静音或取消静音 |
 | `↑` / `↓` | 调高 / 调低音量 |
-| `J` / `L` | 后退 / 前进一个跨度（默认 10 秒），不中断播放 |
+| `J` / `L` | 后退 / 前进一个跨度（默认 5 秒），不中断播放 |
 | `←` / `→` | 移动一帧，按住 `Shift` 移动 1 秒 |
 | `S` | 在当前位置切开片段；当前位置不在选区内时新增一个片段 |
 | `Delete` | 删除选中的片段 |
@@ -251,7 +251,7 @@ Clips are saved next to the source video as `{original-name}_clip_{start}s-{end}
 | `I` / `O` | Set the start / end to the current position |
 | `M` | Mute or unmute |
 | `↑` / `↓` | Raise / lower the volume |
-| `J` / `L` | Jump back / ahead by the skip amount (10 seconds by default) without stopping playback |
+| `J` / `L` | Jump back / ahead by the skip amount (5 seconds by default) without stopping playback |
 | `←` / `→` | Move one frame; hold `Shift` to move 1 second |
 | `S` | Split the range at the current position; outside a range, add a new one |
 | `Delete` | Remove the selected range |
