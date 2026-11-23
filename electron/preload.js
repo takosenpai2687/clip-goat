@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('clipgoat', {
   pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: () => call('dialog:openFile'),
   openFolder: () => call('dialog:openFolder'),
-  scan: (roots) => call('library:scan', roots),
+  scan: (roots, hidden) => call('library:scan', roots, hidden),
   defaultRoot: () => call('library:defaultRoot'),
   moveFile: (src, destDir) => call('fs:move', src, destDir),
   renameFile: (src, stem) => call('fs:rename', src, stem),

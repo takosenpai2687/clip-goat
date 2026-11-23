@@ -53,6 +53,8 @@ export default function App() {
   const [trees, setTrees] = useState([]);
   const [expanded, setExpanded] = useState(() => new Set(storedJson('expanded', [])));
   const [filter, setFilter] = useState('all');
+  // Subfolders the user removed from the library; they are skipped until added back.
+  const [hidden, setHidden] = useState(() => storedJson('hidden', []));
   const [dest, setDest] = useState(() => stored('dest', '') || null);
   const [notice, setNotice] = useState('');
 
@@ -93,7 +95,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(0);
   const undoStack = useRef([]);
-  live.current = { doc, naming, skip, roots, tempRoots, dest, segments, activeId, view, time, load, exp, plan, t };
+  live.current = { doc, naming, skip, roots, tempRoots, hidden, dest, segments, activeId, view, time, load, exp, plan, t };
 
   const duration = doc ? doc.info.duration : 0;
   const fps = doc ? doc.info.video.fps || 30 : 30;
@@ -109,7 +111,7 @@ export default function App() {
       return;
     }
     try {
-      setTrees(await api.scan(all));
+      setTrees(await api.scan(all, live.current.hidden));
     } catch {}
   }, []);
 
@@ -134,9 +136,26 @@ export default function App() {
     });
   }, []);
 
+  // Brings a removed folder back, together with everything under it and the folders above it.
+  const unhide = useCallback((dir) => {
+    setHidden((prev) => {
+      const next = prev.filter((h) => !isInside(h, dir) && !isInside(dir, h));
+      return next.length === prev.length ? prev : next;
+    });
+  }, []);
+
+  const hideDir = useCallback(
+    (dir) => {
+      setHidden((prev) => [...prev.filter((h) => !isInside(h, dir)), dir]);
+      showToast(live.current.t.removedFolder(baseName(dir)));
+    },
+    [showToast],
+  );
+
   // Makes sure a folder is part of the tree and every folder above it is open.
   const reveal = useCallback((dir) => {
     const { roots: saved, tempRoots: temp } = live.current;
+    unhide(dir);
     let root = allRoots(saved, temp).find((r) => isInside(dir, r));
     if (!root) {
       root = dir;
@@ -154,14 +173,21 @@ export default function App() {
       }
       return next;
     });
-  }, []);
+  }, [unhide]);
 
   const addRoot = useCallback(async () => {
     const dir = await api.openFolder();
     if (!dir) return;
-    setRoots((prev) => ((prev || []).some((r) => samePath(r, dir)) ? prev : [...(prev || []), dir]));
+    // A folder that already sits inside the library is shown in its place in the tree, not as a second root.
+    const { roots: saved, tempRoots: temp } = live.current;
+    if (allRoots(saved, temp).some((r) => isInside(dir, r))) {
+      reveal(dir);
+      return;
+    }
+    unhide(dir);
+    setRoots((prev) => [...(prev || []), dir]);
     setExpanded((prev) => new Set(prev).add(dir));
-  }, []);
+  }, [reveal, unhide]);
 
   const removeRoot = useCallback((dir) => {
     setRoots((prev) => (prev || []).filter((r) => !samePath(r, dir)));
@@ -605,8 +631,9 @@ export default function App() {
 
   useEffect(() => {
     if (roots !== null) localStorage.setItem('roots', JSON.stringify(roots));
+    localStorage.setItem('hidden', JSON.stringify(hidden));
     rescan();
-  }, [roots, tempRoots, rescan]);
+  }, [roots, tempRoots, hidden, rescan]);
 
   useEffect(() => localStorage.setItem('expanded', JSON.stringify([...expanded])), [expanded]);
   useEffect(() => localStorage.setItem('dest', dest || ''), [dest]);
@@ -819,6 +846,7 @@ export default function App() {
                     onOpen={openFile}
                     onAddRoot={addRoot}
                     onRemoveRoot={removeRoot}
+                    onHideDir={hideDir}
                     onMove={moveFile}
                     onRename={renameFile}
                     onTrash={trashFile}

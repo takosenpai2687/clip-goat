@@ -124,8 +124,8 @@ function registerIpc() {
     return res.canceled ? null : res.filePaths[0];
   });
 
-  handle('library:scan', async (roots) => {
-    const trees = await library.scanLibrary(roots);
+  handle('library:scan', async (roots, hidden) => {
+    const trees = await library.scanLibrary(roots, hidden || []);
     watcher.set(roots.filter((root) => fs.existsSync(root)));
     return trees;
   });

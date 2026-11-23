@@ -112,6 +112,7 @@ function Library({
   onOpen,
   onAddRoot,
   onRemoveRoot,
+  onHideDir,
   onMove,
   onRename,
   onTrash,
@@ -155,7 +156,7 @@ function Library({
   const dirItems = (row) => [
     { label: t.exportHere, checked: destPath === row.node.path, onSelect: () => onSetDest(row.node.path) },
     { label: t.reveal, onSelect: () => onShow(row.node.path) },
-    ...(row.isRoot ? [{ label: t.removeRoot, onSelect: () => onRemoveRoot(row.node.path) }] : []),
+    { label: t.removeRoot, onSelect: () => (row.isRoot ? onRemoveRoot(row.node.path) : onHideDir(row.node.path)) },
   ];
 
   const commitRename = (file, value) => {

@@ -12,7 +12,7 @@ const BAD_NAME = /[\\/:*?"<>|]/;
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 
 // Returns a folder node, or null when the folder holds no video anywhere below it.
-async function scanDir(dir, depth, budget) {
+async function scanDir(dir, depth, budget, hidden) {
   let entries;
   try {
     entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -26,8 +26,8 @@ async function scanDir(dir, depth, budget) {
     if (entry.name.startsWith('.')) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (depth >= MAX_DEPTH || SKIP_DIRS.has(entry.name)) continue;
-      const child = await scanDir(full, depth + 1, budget);
+      if (depth >= MAX_DEPTH || SKIP_DIRS.has(entry.name) || hidden.has(full.toLowerCase())) continue;
+      const child = await scanDir(full, depth + 1, budget, hidden);
       if (child) dirs.push(child);
     } else if (entry.isFile() && shared.isVideoFile(entry.name)) {
       try {
@@ -60,12 +60,14 @@ function eachFile(node, fn) {
   node.dirs.forEach((d) => eachFile(d, fn));
 }
 
+// One tree per root. Folders in `hidden` were removed from the library by the user and are skipped.
 // One tree per root. Each original gets clips: how many clips anywhere in the library were cut from it.
-async function scanLibrary(roots) {
+async function scanLibrary(roots, hiddenDirs = []) {
   const budget = { left: MAX_ENTRIES };
+  const hidden = new Set(hiddenDirs.map((dir) => dir.toLowerCase()));
   const trees = [];
   for (const root of roots) {
-    const node = await scanDir(root, 0, budget);
+    const node = await scanDir(root, 0, budget, hidden);
     trees.push(node || { path: root, name: path.basename(root) || root, dirs: [], files: [], total: 0, missing: true });
   }
   const clippedFrom = new Map();
