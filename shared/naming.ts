@@ -28,14 +28,12 @@ export function formatSeconds(sec: number): string {
   return String(Number(Number(sec).toFixed(2)));
 }
 
-// {original-name}_clip_{start}s-{end}s.mp4; joined clips add "_{n}parts".
+// {original-name}_clip_{length}s.mp4, where length is the total duration of the clip.
+// Where the clip was cut from is kept in the file's metadata, not in its name.
 export function buildClipName(inputPath: string, segments: Segment[], ext = '.mp4'): string {
   const base = path.basename(inputPath, path.extname(inputPath));
-  const first = segments[0];
-  const last = segments[segments.length - 1];
-  const range = `${formatSeconds(first.start)}s-${formatSeconds(last.end)}s`;
-  const parts = segments.length > 1 ? `_${segments.length}parts` : '';
-  return `${base}${CLIP_MARKER}${range}${parts}${ext}`;
+  const length = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
+  return `${base}${CLIP_MARKER}${formatSeconds(length)}s${ext}`;
 }
 
 export function defaultOutputPath(inputPath: string, segments: Segment[], ext = '.mp4'): string {

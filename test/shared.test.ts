@@ -9,14 +9,14 @@ test('isClippedFile looks only at the _clip_ marker in the file name', () => {
   assert.equal(isClippedFile('Game clip.mp4'), false);
 });
 
-test('buildClipName follows the template and trims decimals', () => {
-  assert.equal(buildClipName(path.join('videos', 'Game_20261122_1430.mp4'), [{ start: 112.5, end: 115.8 }]), 'Game_20261122_1430_clip_112.5s-115.8s.mp4');
+test('buildClipName ends with the total length of the clip', () => {
+  assert.equal(buildClipName(path.join('videos', 'Game_20261122_1430.mp4'), [{ start: 112.5, end: 115.8 }]), 'Game_20261122_1430_clip_3.3s.mp4');
   assert.equal(
     buildClipName('a.b.mkv', [
       { start: 0, end: 3.004 },
       { start: 10, end: 12.256 },
     ]),
-    'a.b_clip_0s-12.26s_2parts.mp4',
+    'a.b_clip_5.26s.mp4',
   );
 });
 

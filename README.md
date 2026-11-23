@@ -59,7 +59,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 3. **导出**：按回车，确认文件名后再按一次回车。
 4. **清理**（可选）：导出后点"删除原视频"，把原片移到回收站。
 
-片段默认保存在原视频旁边，命名为 `{原文件名}_clip_{起点}s-{终点}s.mp4`，重名时自动加序号。
+片段默认保存在原视频旁边，命名为 `{原文件名}_clip_{时长}s.mp4`，例如 `Game_clip_12.5s.mp4`，重名时自动加序号。
 
 - 导出按钮左侧的两个标记分别显示导出位置和导出方式（"秒出"或"精确"）。点击前者可更改文件夹；点击"精确"可把起点对齐到关键帧，改为秒出。
 - 鼠标移到预览画面上时，会出现播放、后退、前进、音量和倍速控制。右键后退或前进按钮可更改跨度；音量和倍速只影响预览。
@@ -220,7 +220,7 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 3. **Export**: press Enter, confirm the file name, and press Enter again.
 4. **Clean up** (optional): after the export, click "Delete original" to move the original to the Recycle Bin.
 
-Clips are saved next to the source video as `{original-name}_clip_{start}s-{end}s.mp4`; a number is appended if the name is taken.
+Clips are saved next to the source video as `{original-name}_clip_{length}s.mp4`, for example `Game_clip_12.5s.mp4`; a number is appended if the name is taken.
 
 - The two chips to the left of the Export button show the destination and the export mode ("Instant" or "Exact"). Click the first to change the folder; click "Exact" to move the start onto a keyframe and export instantly.
 - When the pointer is over the preview, controls for play, back, forward, volume and speed appear. Right-click back or forward to change the skip amount; volume and speed affect the preview only.

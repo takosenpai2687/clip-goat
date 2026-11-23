@@ -18,7 +18,7 @@ Options:
   -s, --start <sec>      Start in seconds (decimals allowed)
   -e, --end <sec>        End in seconds (decimals allowed)
       --segments <list>  Several ranges joined in order: start-end,start-end
-  -o, --output <file>    Output path (.mp4/.mov/.mkv). Default: {name}_clip_{start}s-{end}s.mp4 next to the input
+  -o, --output <file>    Output path (.mp4/.mov/.mkv). Default: {name}_clip_{length}s.mp4 next to the input
       --out-dir <dir>    Keep the default file name but write it into this folder
       --fast             Stream copy from the keyframe at or before start (instant; may begin slightly early)
       --force-encode     Always re-encode, skip stream copy

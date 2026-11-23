@@ -210,7 +210,7 @@ export interface ClipOptions {
   input: string;
   /** Ranges in seconds. */
   segments: Segment[];
-  /** Defaults to {name}_clip_{start}s-{end}s.mp4 next to the input. */
+  /** Defaults to {name}_clip_{length}s.mp4 next to the input. */
   output?: string;
   /** Keep the default name but write it into this folder. */
   outputDir?: string;
