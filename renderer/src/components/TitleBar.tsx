@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Download, FilePlus, Moon, PanelLeft, Sun } from 'lucide-react';
+import { FilePlus, Moon, PanelLeft, RefreshCw, Sun } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import type { Theme } from '../../../shared/types';
 import icon from '../assets/icon.webp';
@@ -44,7 +44,7 @@ function TitleBar({ fileName, theme, onTheme, onLang, onSidebar, sidebarOpen, on
           <FilePlus size={16} strokeWidth={1.5} />
         </button>
         <button type="button" className="icon-button" onClick={onCheckUpdate} aria-label={t.checkUpdate} title={t.checkUpdate}>
-          <Download size={16} strokeWidth={1.5} />
+          <RefreshCw size={16} strokeWidth={1.5} />
         </button>
         <button type="button" className="icon-button text-button" onClick={onLang} aria-label={t.toggleLang} title={t.toggleLang}>
           {t.langLabel}
