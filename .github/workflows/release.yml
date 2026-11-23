@@ -1,0 +1,99 @@
+name: Release
+
+# Pushing a tag like v1.2.3 builds the Windows installer and the macOS disk image,
+# then collects them in a draft release for a last look before publishing.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win nsis --x64
+          - os: macos-latest
+            args: --mac dmg --arm64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check that the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      # The lockfile was written against a mirror; fetch from the default registry here.
+      - run: npm ci --replace-registry-host=registry.npmmirror.com
+
+      - run: npm test
+
+      - name: Cut a clip with the command line
+        run: |
+          FFMPEG="$(node -p "require('ffmpeg-static')")"
+          "$FFMPEG" -v error -y -f lavfi -i testsrc2=size=640x360:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 \
+            -c:v libx264 -preset ultrafast -g 30 -pix_fmt yuv420p -c:a aac "$RUNNER_TEMP/sample.mp4"
+          node dist/cli/index.js -i "$RUNNER_TEMP/sample.mp4" -s 2 -e 5 --json
+          node dist/cli/index.js -i "$RUNNER_TEMP/sample.mp4" -s 2.5 -e 5 --force-encode --json
+
+      - name: Package
+        run: npm run dist -- ${{ matrix.args }}
+
+      - name: Check the macOS app
+        if: runner.os == 'macOS'
+        run: |
+          APP="release/mac-arm64/Clip Goat.app"
+          BIN="$APP/Contents/Resources/app.asar.unpacked/node_modules"
+          codesign --verify --deep --strict "$APP"
+          "$BIN/ffmpeg-static/ffmpeg" -version | head -n 1
+          "$BIN/ffprobe-static/bin/darwin/arm64/ffprobe" -version | head -n 1
+          "$APP/Contents/MacOS/Clip Goat" --user-data-dir="$RUNNER_TEMP/profile" &
+          PID=$!
+          sleep 20
+          kill -0 "$PID"
+          kill "$PID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+            release/*.dmg
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES="docs/release-notes/$VERSION.md"
+          ls -l out
+          if [ -f "$NOTES" ]; then
+            gh release create "$GITHUB_REF_NAME" out/* --draft --title "Clip Goat $VERSION" --notes-file "$NOTES"
+          else
+            gh release create "$GITHUB_REF_NAME" out/* --draft --title "Clip Goat $VERSION" --generate-notes
+          fi

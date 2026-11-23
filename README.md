@@ -8,7 +8,7 @@
 
 Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，基于 ffmpeg、使用 Electron、React 和 TypeScript 构建，同时提供命令行。
 
-**下载**：在 [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) 页面获取 Windows 安装包。安装后可在应用内一键更新。
+**下载**：在 [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) 页面获取 Windows 安装包（64 位）或 macOS 磁盘映像（Apple Silicon）。Windows 版安装后可在应用内一键更新；macOS 版由自动构建生成，没有在实机上测试过，也没有 Apple 开发者签名，首次打开前需要在终端执行 `xattr -cr "/Applications/Clip Goat.app"`。
 
 ## 适用场景
 
@@ -133,7 +133,9 @@ npm run dist
 
 安装包生成在 `release` 文件夹中。只使用命令行时，执行 `npm install` 和 `npm run build` 后运行 `npm link`，即可在任意目录使用 `clip-goat` 命令。
 
-`npm run dist` 为当前系统打包：在 Windows 上生成安装包，在 macOS 上生成 `.dmg`（Intel 和 Apple Silicon 均可）。macOS 版本没有发布包，也没有在实机上测试过；它使用临时签名，只适合在构建它的那台电脑上使用。应用内更新和撤销删除只在 Windows 上可用。
+`npm run dist` 为当前系统打包：在 Windows 上生成安装包，在 macOS 上生成 `.dmg`（Intel 和 Apple Silicon 均可）。macOS 版本没有在实机上测试过，使用临时签名。应用内更新和撤销删除只在 Windows 上可用。
+
+推送形如 `v1.2.3` 的标签后，GitHub Actions 会构建 Windows x64 安装包和 macOS Apple Silicon 磁盘映像，并放进一个草稿 Release；发布说明取自 `docs/release-notes/1.2.3.md`。
 
 中国大陆的网络环境下，安装依赖前需要设置镜像：
 
@@ -167,7 +169,7 @@ npm install --registry=https://registry.npmmirror.com
 
 Clip Goat is a lightweight and efficient tool for pulling highlights out of videos and organising your footage. It is powered by ffmpeg, built with Electron, React and TypeScript, and ships with a command-line interface.
 
-**Download**: get the Windows installer from the [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) page. Once installed, the app updates itself in one click.
+**Download**: get the Windows installer (64-bit) or the macOS disk image (Apple Silicon) from the [Releases](https://github.com/takosenpai2687/clip-goat/releases/latest) page. Once installed, the Windows app updates itself in one click. The macOS build comes from an automated build, has not been tested on a real Mac and has no Apple developer signature; before the first launch, run `xattr -cr "/Applications/Clip Goat.app"` in Terminal.
 
 ## Use cases
 
@@ -292,7 +294,9 @@ npm run dist
 
 The installer is written to the `release` folder. To use only the command line, run `npm install` and `npm run build`, then `npm link`; the `clip-goat` command is then available in any directory.
 
-`npm run dist` packages for the system it runs on: an installer on Windows, a `.dmg` on macOS (Intel or Apple Silicon). There is no published macOS build and it has not been tested on a real Mac; it is ad-hoc signed, so it is only meant for the computer that built it. In-app updates and undoing a delete work on Windows only.
+`npm run dist` packages for the system it runs on: an installer on Windows, a `.dmg` on macOS (Intel or Apple Silicon). The macOS build has not been tested on a real Mac and is ad-hoc signed. In-app updates and undoing a delete work on Windows only.
+
+Pushing a tag such as `v1.2.3` makes GitHub Actions build the Windows x64 installer and the macOS Apple Silicon disk image and collect them in a draft release; the notes come from `docs/release-notes/1.2.3.md`.
 
 On networks in mainland China, set these mirrors before installing the dependencies:
 
