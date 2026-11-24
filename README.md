@@ -19,7 +19,7 @@ Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游�
 以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
 
 <p align="center">
-  <img src="docs/video-clipping.jpg" width="860" alt="在 Clip Goat 中预览游戏录像并选择要导出的片段" />
+  <img src="docs/video-clipping-20261125-011455.jpg" width="860" alt="在 Clip Goat 中预览游戏录像并选择要导出的片段" />
 </p>
 
 Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全部录像，截出需要的十几秒，再把原片移到回收站，把片段归到合适的文件夹。
@@ -29,7 +29,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 有些录音或视频可能一边声音更大，甚至只有一边有声音。可以将左右声道合并，或选取较清晰的一边送到双耳，实时试听后再导出。处理后的声音为单声道，双耳内容相同，但不再保留立体声空间感。
 
 <p align="center">
-  <img src="docs/audio-channels.jpg" width="860" alt="在 Clip Goat 的声道工作台试听左右耳波形并合并声道" />
+  <img src="docs/audio-channels-20261125-011455.jpg" width="860" alt="在 Clip Goat 的声道工作台查看声音不一致的左右声道波形" />
 </p>
 
 ## 为什么做 Clip Goat
@@ -202,7 +202,7 @@ Clip Goat suits any situation where the video is long and the part you need is s
 Game replays are a typical example. Features such as NVIDIA Instant Replay save the last fixed stretch of gameplay each time. A 2-minute 4K60 recording is about 700 MB, and the part worth keeping is usually only a dozen seconds or so. As recordings pile up, they become hard to find and take up a lot of disk space.
 
 <p align="center">
-  <img src="docs/video-clipping.jpg" width="860" alt="Previewing a game recording and selecting a clip in Clip Goat" />
+  <img src="docs/video-clipping-20261125-011455.jpg" width="860" alt="Previewing a game recording and selecting a clip in Clip Goat" />
 </p>
 
 Clip Goat is designed around this workflow: it lists every recording in your Videos folder on launch, cuts out the dozen seconds you need, then moves the original to the Recycle Bin and files the clip in the folder where it belongs.
@@ -212,7 +212,7 @@ Clip Goat is designed around this workflow: it lists every recording in your Vid
 Some recordings or videos sound louder on one side, or have sound on only one side. Merge the left and right channels, or send the clearer side to both ears, then preview and export. The processed audio is mono: both ears hear the same content, but stereo separation is lost.
 
 <p align="center">
-  <img src="docs/audio-channels.jpg" width="860" alt="Previewing both ear waveforms and merging channels in the Clip Goat audio workbench" />
+  <img src="docs/audio-channels-20261125-011455.jpg" width="860" alt="Viewing uneven left and right channel waveforms in the Clip Goat audio workbench" />
 </p>
 
 ## Why Clip Goat
