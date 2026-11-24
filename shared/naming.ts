@@ -12,8 +12,8 @@ export function isMediaFile(filename: string): boolean {
   return MEDIA_EXTS.includes(path.extname(String(filename)).toLowerCase());
 }
 
-export function defaultExtension(info: Pick<VideoInfo, 'video'>): string {
-  return info.video ? '.mp4' : '.m4a';
+export function defaultExtension(info: Pick<VideoInfo, 'video'>, input: string): string {
+  return info.video ? '.mp4' : path.extname(input).toLowerCase();
 }
 
 export function isVideoFile(filename: string): boolean {

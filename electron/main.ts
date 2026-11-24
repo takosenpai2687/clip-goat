@@ -225,7 +225,7 @@ function registerIpc(): void {
     const plan = shared.planSegments(segments, cachedKeyframes(input), 'auto', fps, Boolean(info.video));
     const dir = outputDir || path.dirname(input);
     const origin = shared.lineage(info.origin, input, plan.segments);
-    const output = shared.uniquePath(path.join(dir, shared.buildClipName(origin.source, origin.segments, shared.defaultExtension(info))));
+    const output = shared.uniquePath(path.join(dir, shared.buildClipName(origin.source, origin.segments, shared.defaultExtension(info, input))));
     return { mode: !info.video && audio && audio.mode !== 'original' ? 'encode' : plan.mode, name: path.basename(output), dir };
   });
 
@@ -236,7 +236,7 @@ function registerIpc(): void {
       if (/[\\/:*?"<>|]/.test(name) || name.endsWith('.')) fail('That name is not allowed.', 'BAD_NAME');
       const info = mediaInfo.get(input);
       if (!info) fail('Open the media file before exporting.', 'BAD_INPUT');
-      output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}${shared.defaultExtension(info)}`));
+      output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}${shared.defaultExtension(info, input)}`));
     }
     if (exportJob) fail('An export is already running.', 'BUSY');
     const job = new AbortController();

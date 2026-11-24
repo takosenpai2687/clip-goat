@@ -8,9 +8,42 @@ import { buildClipName, uniquePath, encodeOrigin, lineage, defaultExtension } fr
 import { AUDIO_MODES, channelFilter, supportsAudioMode } from './audio';
 import type { AudioSettings, ClipMode, ClipProgress, ClipResult, ExportMode, Segment, VideoInfo } from './types';
 
-type Container = 'mp4' | 'mov' | 'matroska';
+type Container = 'mp4' | 'mov' | 'matroska' | 'mp3' | 'adts' | 'wav' | 'flac' | 'ogg' | 'opus' | 'aiff' | 'asf' | 'webm' | 'avi' | 'mpegts' | 'flv' | 'mpeg' | '3gp';
 
-const FORMATS: Record<string, Container> = { '.mp4': 'mp4', '.m4a': 'mp4', '.m4v': 'mp4', '.mov': 'mov', '.mkv': 'matroska' };
+const FORMATS: Record<string, Container> = {
+  '.mp4': 'mp4', '.m4a': 'mp4', '.m4v': 'mp4', '.mov': 'mov', '.mkv': 'matroska',
+  '.mp3': 'mp3', '.aac': 'adts', '.wav': 'wav', '.flac': 'flac', '.ogg': 'ogg',
+  '.opus': 'opus', '.aiff': 'aiff', '.aif': 'aiff', '.wma': 'asf',
+  '.webm': 'webm', '.avi': 'avi', '.ts': 'mpegts', '.m2ts': 'mpegts',
+  '.flv': 'flv', '.wmv': 'asf', '.mpg': 'mpeg', '.mpeg': 'mpeg', '.3gp': '3gp',
+};
+
+function audioEncodeArgs(format: Container, info: VideoInfo, audio?: AudioSettings): string[] {
+  const tracks = audio?.track === undefined ? info.audio : [info.audio[audio.track]];
+  if (format === 'ogg') {
+    return tracks.flatMap((track, i) => [`-c:a:${i}`, track.codec === 'opus' ? 'libopus' : track.codec === 'flac' ? 'flac' : 'libvorbis']);
+  }
+  if (format === 'wav' || format === 'aiff') {
+    const endian = format === 'wav' ? 'le' : 'be';
+    const args = tracks.flatMap((track, i) => {
+      const match = /^pcm_(s16|s24|s32|f32|f64)(?:le|be)$/.exec(track.codec);
+      const codec = match ? `pcm_${match[1]}${endian}` : format === 'wav' && track.codec === 'pcm_u8' ? 'pcm_u8' : `pcm_s16${endian}`;
+      return [`-c:a:${i}`, codec];
+    });
+    return args;
+  }
+  const codec = format === 'mp3' || format === 'mpeg' ? 'libmp3lame'
+    : format === 'flac' ? 'flac'
+      : format === 'opus' || format === 'webm' ? 'libopus'
+        : format === 'asf' ? 'wmav2' : 'aac';
+  return ['-c:a', codec, ...(codec === 'flac' ? [] : ['-b:a', '192k'])];
+}
+
+function addOutputArgs(args: string[], format: Container, out: string): void {
+  if (format === 'mp4' || format === 'mov' || format === '3gp') args.push('-movflags', '+faststart');
+  if (format === 'adts') args.push('-write_id3v2', '1');
+  args.push('-f', format, out);
+}
 
 export function validateAudioSettings(info: VideoInfo, audio?: AudioSettings): void {
   if (audio === undefined) return;
@@ -127,7 +160,7 @@ export function buildArgs({ input, seg, out, format, mode, info, comment, audio 
       args.push('-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2');
     }
     if (info.video) args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p');
-    args.push('-c:a', 'aac', '-b:a', '192k');
+    args.push(...audioEncodeArgs(format, info, audio));
     // Never spend more bits than the source had: CRF alone can overshoot on noisy game footage.
     if (info.video && info.video.bitrate > 0) {
       args.push('-maxrate', String(Math.round(info.video.bitrate)), '-bufsize', String(Math.round(info.video.bitrate * 2)));
@@ -139,11 +172,10 @@ export function buildArgs({ input, seg, out, format, mode, info, comment, audio 
       const filter = channelFilter(audio.mode, track.channels);
       if (filter) args.push(`-filter:a:${i}`, filter);
     });
-    args.push('-c:a', 'aac', '-b:a', '192k');
+    args.push(...audioEncodeArgs(format, info, audio));
   }
   if (comment) args.push('-metadata', `comment=${comment}`);
-  if (format !== 'matroska') args.push('-movflags', '+faststart');
-  args.push('-f', format, out);
+  addOutputArgs(args, format, out);
   return args;
 }
 
@@ -151,8 +183,7 @@ function concatArgs({ listFile, out, format, info, comment }: { listFile: string
   const args = ['-hide_banner', '-nostdin', '-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-map', '0', '-c', 'copy'];
   if (info.video?.codec === 'hevc' && format !== 'matroska') args.push('-tag:v', 'hvc1');
   if (comment) args.push('-metadata', `comment=${comment}`);
-  if (format !== 'matroska') args.push('-movflags', '+faststart');
-  args.push('-f', format, out);
+  addOutputArgs(args, format, out);
   return args;
 }
 
@@ -171,10 +202,9 @@ function audioConcatArgs({ input, segments, out, format, info, comment, audio }:
   }
   args.push('-filter_complex', filters.join(';'));
   for (const track of tracks) args.push('-map', `[a${track}]`);
-  args.push('-c:a', 'aac', '-b:a', '192k');
+  args.push(...audioEncodeArgs(format, info, audio));
   if (comment) args.push('-metadata', `comment=${comment}`);
-  if (format !== 'matroska') args.push('-movflags', '+faststart');
-  args.push('-f', format, out);
+  addOutputArgs(args, format, out);
   return args;
 }
 
@@ -258,8 +288,8 @@ async function attempt({ input, segments, mode, tmpOut, format, info, comment, s
   if (Math.abs(out.duration - total) > slack) {
     throw new ClipError('BAD_OUTPUT', `Exported ${out.duration.toFixed(2)}s but expected ${total.toFixed(2)}s.`);
   }
-  if (audio && (out.audio.length !== (audio.track === undefined ? info.audio.length : 1)
-    || (audio.mode !== 'original' && out.audio.some((track) => track.channels !== 1)))) {
+  if (out.audio.length !== (audio?.track === undefined ? info.audio.length : 1)
+    || (audio && audio.mode !== 'original' && out.audio.some((track) => track.channels !== 1))) {
     throw new ClipError('BAD_OUTPUT', 'The exported audio does not match the selected track/channel settings.');
   }
   return out;
@@ -269,7 +299,7 @@ export interface ClipOptions {
   input: string;
   /** Ranges in seconds. */
   segments: Segment[];
-  /** Defaults to {name}_clip_{length}s.mp4 (video) or .m4a (audio) next to the input. */
+  /** Defaults to {name}_clip_{length}s with .mp4 for video or the input extension for audio. */
   output?: string;
   /** Keep the default name but write it into this folder. */
   outputDir?: string;
@@ -317,13 +347,15 @@ export async function clip(opts: ClipOptions): Promise<ClipResult> {
   const comment = encodeOrigin(origin);
   let output = opts.output
     ? path.resolve(opts.output)
-    : path.join(opts.outputDir ? path.resolve(opts.outputDir) : path.dirname(path.resolve(input)), buildClipName(origin.source, origin.segments, defaultExtension(info)));
+    : path.join(opts.outputDir ? path.resolve(opts.outputDir) : path.dirname(path.resolve(input)), buildClipName(origin.source, origin.segments, defaultExtension(info, input)));
   const ext = path.extname(output).toLowerCase();
   const format = FORMATS[ext];
   if (!format) {
-    throw new ClipError('BAD_OUTPUT_PATH', `Unsupported output extension "${ext}". Use .mp4, .m4a, .mov or .mkv.`);
+    throw new ClipError('BAD_OUTPUT_PATH', `Unsupported output extension "${ext}".`);
   }
-  if (info.video && ext === '.m4a') throw new ClipError('BAD_OUTPUT_PATH', 'Use .mp4, .mov or .mkv for video.');
+  if (info.video && !['.mp4', '.m4v', '.mov', '.mkv'].includes(ext)) {
+    throw new ClipError('BAD_OUTPUT_PATH', 'Use .mp4, .m4v, .mov or .mkv for video.');
+  }
   // A default name that collides with the input just gets a counter below.
   if (path.resolve(input).toLowerCase() === output.toLowerCase() && (opts.output || overwrite)) {
     throw new ClipError('BAD_OUTPUT_PATH', 'The output file must differ from the input file.');

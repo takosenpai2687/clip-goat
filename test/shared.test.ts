@@ -8,15 +8,17 @@ import { isClippedFile, buildClipName, uniquePath, planSegments, validateSegment
 
 function toneAmplitudes(file: string): number[] {
   const pcm = execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-t', '0.5', '-f', 'f32le', '-ar', '48000', '-ac', '1', 'pipe:1']);
+  const end = Math.min(24000, pcm.length / 4);
+  assert.ok(end > 4800, `Not enough audio samples in ${file}`);
   return [440, 880].map((frequency) => {
     let real = 0;
     let imaginary = 0;
-    for (let i = 4800; i < 24000; i++) {
+    for (let i = 4800; i < end; i++) {
       const sample = pcm.readFloatLE(i * 4);
       real += sample * Math.cos(2 * Math.PI * frequency * i / 48000);
       imaginary += sample * Math.sin(2 * Math.PI * frequency * i / 48000);
     }
-    return Math.hypot(real, imaginary) * 2 / 19200;
+    return Math.hypot(real, imaginary) * 2 / (end - 4800);
   });
 }
 
@@ -176,7 +178,7 @@ test('channel modes write mono with the intended signal, including joined ranges
   }
 });
 
-test('audio copy with excessive seek preroll falls back to AAC and can build a preview', async () => {
+test('audio copy with excessive seek preroll falls back to the original format and can build a preview', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-audio-'));
   try {
     const input = path.join(dir, 'recording.ogg');
@@ -186,7 +188,8 @@ test('audio copy with excessive seek preroll falls back to AAC and can build a p
     assert.equal(result.fellBack, true);
     assert.equal(result.mode, 'encode');
     assert.equal(info.video, null);
-    assert.equal(info.audio[0].codec, 'aac');
+    assert.equal(path.extname(result.output), '.ogg');
+    assert.equal(info.audio[0].codec, 'vorbis');
     assert.equal(info.audio[0].channels, 2);
     assert.ok(Math.abs(info.duration - 2) < 0.1);
     const preview = path.join(dir, 'preview.mp4');
@@ -194,6 +197,107 @@ test('audio copy with excessive seek preroll falls back to AAC and can build a p
     const previewInfo = await probe(preview);
     assert.equal(previewInfo.video, null);
     assert.equal(previewInfo.audio[0].codec, 'aac');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio exports retain the input format when copying, encoding and processing channels', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-formats-'));
+  try {
+    const formats = [
+      ['mp3', 'libmp3lame', 'mp3'], ['m4a', 'aac', 'aac'], ['aac', 'aac', 'aac'],
+      ['wav', 'pcm_s24le', 'pcm_s24le'], ['flac', 'flac', 'flac'], ['ogg', 'libvorbis', 'vorbis'],
+      ['opus', 'libopus', 'opus'], ['aiff', 'pcm_s24be', 'pcm_s24be'], ['aif', 'pcm_s24be', 'pcm_s24be'],
+      ['wma', 'wmav2', 'wmav2'],
+    ];
+    for (const [ext, encoder, codec] of formats) {
+      const input = path.join(dir, `input.${ext}`);
+      execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i',
+        'aevalsrc=0.3*sin(2*PI*440*t)|0.1*sin(2*PI*880*t):s=48000:d=3', '-c:a', encoder, input]);
+      const result = await clip({
+        input, segments: [{ start: 0.25, end: 0.75 }, { start: 1.25, end: 2.25 }], audio: { mode: 'right' },
+      });
+      const info = await probe(result.output);
+      assert.equal(path.extname(result.output), `.${ext}`);
+      assert.equal(info.audio[0].codec, codec, ext);
+      assert.equal(info.audio[0].channels, 1, ext);
+      assert.equal(info.origin?.source, `input.${ext}`, `${ext}: source metadata`);
+      const tones = toneAmplitudes(result.output);
+      assert.ok(tones[1] > 0.05 && tones[0] < 0.01, `${ext}: output must contain the right channel`);
+      if (ext === 'aac' || ext === 'ogg') {
+        const recut = await clip({ input: result.output, segments: [{ start: 0.1, end: 0.5 }] });
+        assert.equal(path.extname(recut.output), `.${ext}`);
+        assert.equal((await probe(recut.output)).origin?.source, `input.${ext}`);
+      }
+    }
+    const mp3 = path.join(dir, 'input.mp3');
+    const copied = await clip({ input: mp3, segments: [{ start: 0, end: 2 }] });
+    assert.equal(path.extname(copied.output), '.mp3');
+    assert.equal((await probe(copied.output)).audio[0].codec, 'mp3');
+    assert.equal(copied.mode, 'copy');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('video channel processing keeps audio in sync and preserves the usual video export strategy', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-video-audio-'));
+  try {
+    const input = path.join(dir, 'sync.mp4');
+    execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i',
+      "color=black:s=160x90:r=30:d=4,drawbox=x=0:y=0:w=iw:h=ih:color=white:t=fill:enable='between(t,1.5,2.0)'",
+      '-f', 'lavfi', '-i',
+      'aevalsrc=if(between(t\\,1.5\\,2.0)\\,0.3*sin(2*PI*220*t)\\,0)|if(between(t\\,1.5\\,2.0)\\,0.3*sin(2*PI*440*t)\\,0):s=48000:d=4',
+      '-f', 'lavfi', '-i',
+      'aevalsrc=if(between(t\\,1.5\\,2.0)\\,0.3*sin(2*PI*660*t)\\,0)|if(between(t\\,1.5\\,2.0)\\,0.3*sin(2*PI*880*t)\\,0):s=48000:d=4',
+      '-map', '0:v', '-map', '1:a', '-map', '2:a',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '30', '-sc_threshold', '0', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', input]);
+    const frame = (file: string, time: number) => execFileSync(ffmpegPath(), [
+      '-v', 'error', '-i', file, '-ss', String(time), '-frames:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', 'pipe:1',
+    ])[0];
+    const volume = (file: string, time: number) => {
+      const pcm = execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-ss', String(time), '-t', '0.1', '-ac', '1', '-f', 'f32le', 'pipe:1']);
+      let sum = 0;
+      for (let i = 0; i < pcm.length; i += 4) sum += pcm.readFloatLE(i) ** 2;
+      return Math.sqrt(sum / (pcm.length / 4));
+    };
+    const tone = (file: string, time: number, frequency: number) => {
+      const pcm = execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-ss', String(time), '-t', '0.1',
+        '-ac', '1', '-ar', '48000', '-f', 'f32le', 'pipe:1']);
+      let real = 0;
+      let imaginary = 0;
+      for (let i = 0; i < pcm.length / 4; i++) {
+        real += pcm.readFloatLE(i * 4) * Math.cos(2 * Math.PI * frequency * i / 48000);
+        imaginary += pcm.readFloatLE(i * 4) * Math.sin(2 * Math.PI * frequency * i / 48000);
+      }
+      return Math.hypot(real, imaginary) * 2 / (pcm.length / 4);
+    };
+    const videoHash = (file: string) => execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-map', '0:v:0',
+      '-c', 'copy', '-f', 'hash', '-hash', 'md5', 'pipe:1'], { encoding: 'utf8' });
+    for (const [start, expectedMode] of [[1, 'copy'], [1.2, 'encode']] as const) {
+      const result = await clip({ input, segments: [{ start, end: 3 }], audio: { mode: 'right', track: 1 } });
+      const before = 1.5 - start - 0.15;
+      const during = 1.5 - start + 0.15;
+      assert.equal(path.extname(result.output), '.mp4');
+      assert.equal(result.mode, 'encode');
+      assert.equal((await probe(result.output)).audio[0].channels, 1);
+      assert.ok(frame(result.output, before) < 40 && frame(result.output, during) > 200, expectedMode);
+      assert.ok(volume(result.output, before) < 0.01 && volume(result.output, during) > 0.1, expectedMode);
+      assert.ok(tone(result.output, during, 880) > 0.2 && tone(result.output, during, 440) < 0.02, 'must use the right channel of track 2');
+      const plain = await clip({ input, segments: [{ start, end: 3 }] });
+      assert.equal(plain.mode, expectedMode);
+      assert.equal(videoHash(result.output), videoHash(plain.output), `${expectedMode}: audio processing changed video`);
+    }
+    const segments = [{ start: 0, end: 1 }, { start: 1, end: 3 }];
+    const joined = await clip({ input, segments, audio: { mode: 'right', track: 1 } });
+    assert.ok(frame(joined.output, 1.35) < 40 && frame(joined.output, 1.65) > 200);
+    assert.ok(volume(joined.output, 1.35) < 0.01 && volume(joined.output, 1.65) > 0.1);
+    assert.ok(tone(joined.output, 1.65, 880) > 0.2 && tone(joined.output, 1.65, 440) < 0.02);
+    const joinedPlain = await clip({ input, segments });
+    assert.equal(joinedPlain.mode, 'copy');
+    assert.equal(videoHash(joined.output), videoHash(joinedPlain.output), 'Joining with audio processing changed video');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

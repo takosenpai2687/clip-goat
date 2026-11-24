@@ -26,7 +26,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 
 ### 处理左右声道不一致
 
-有些录音或视频可能一边声音更大，甚至只有一边有声音。可以将左右声道合并，或选取较清晰的一边送到双耳，实时试听后再导出。处理后的声音为单声道，双耳内容相同，但不再保留立体声空间感。
+有些录音或视频可能一边声音更大，甚至只有一边有声音。可以将左右声道合并，或选取较清晰的一边送到双耳，实时试听后再导出。处理后的声音为单声道，双耳内容相同，**但不再保留立体声空间感**。
 
 <p align="center">
   <img src="docs/audio-channels-20261125-011455.jpg" width="860" alt="在 Clip Goat 的声道工作台查看声音不一致的左右声道波形" />
@@ -44,7 +44,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 
 *其余的步骤都被省掉了：不用新建工程，不用铺时间线，不用填导出参数，不用给文件起名。*
 
-它不能替代剪辑软件：没有转场、字幕、调色和多轨时间线。
+**它不能替代剪辑软件：没有转场、字幕、调色和多轨时间线。**
 
 ## 功能
 
@@ -73,9 +73,9 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 
 片段默认保存在原视频旁边，命名为 `{原文件名}_clip_{时长}s.mp4`，例如 `Game_clip_12.5s.mp4`，重名时自动加序号。
 
-纯音频默认导出为 `.m4a`，保留全部音轨；优先流复制，源编码不兼容时自动改为 AAC。起止时间、片段来源、重命名和撤销等逻辑与视频一致。音频预览显示文件名，时间轨不生成视频缩略图或波形，默认仍从系统“视频”文件夹开始，可手动添加音乐文件夹。
+纯音频默认保持输入格式，例如 MP3 导出为 MP3；优先流复制，需要时使用该格式支持的编码重新编码。起止时间、片段来源、重命名和撤销等逻辑与视频一致。音频预览显示文件名，时间轨不生成视频缩略图或波形，默认仍从系统“视频”文件夹开始，可手动添加音乐文件夹。
 
-- **声道工作台**：音频预览区显示左右耳的实时输出波形，带音轨的视频也可用预览区底部的按钮切换到声道工作台。暂停时保留最后采样，切换模式可对比同一帧；可选择“保持原样 / 左右合并 / 仅左声道 / 仅右声道”，播放时切换可立即试听，设置作用于整个文件和所有选区。后三种模式导出为单声道 AAC，让双耳播放同一份声音；“左右合并”各取一半，不是自动响度均衡，会失去立体声空间感，反相声音也可能抵消。视频是否重新编码仍由关键帧决定。
+- **声道工作台**：音频预览区显示左右耳的实时输出波形，带音轨的视频也可用预览区底部的按钮切换到声道工作台。暂停时保留最后采样，切换模式可对比同一帧；可选择“保持原样 / 左右合并 / 仅左声道 / 仅右声道”，播放时切换可立即试听，设置作用于整个文件和所有选区。后三种模式重新编码音频并输出单声道，让双耳播放同一份声音；“左右合并”各取一半，不是自动响度均衡，会失去立体声空间感，反相声音也可能抵消。视频画面是否重新编码仍由关键帧决定。
 - **多音轨**：默认保留全部音轨、试听第 1 轨；也可选择某一轨，此时试听和导出都只使用该轨。音轨不会自动混在一起。声道处理支持单声道或立体声；原文件没有右声道时，不能选择“仅右声道”。多声道环绕音频可保持原样导出。
 - 导出按钮左侧的两个标记分别显示导出位置和导出方式（"秒出"或"精确"）。点击前者可更改文件夹；点击"精确"可把起点对齐到关键帧，改为秒出。
 - 鼠标移到预览画面上时，会出现播放、后退、前进、音量和倍速控制。右键后退或前进按钮可更改跨度；音量和倍速只影响预览。
@@ -112,7 +112,7 @@ clip-goat -i Game.mp4 -s 112.5 -e 115.8
 | `-s, --start` | 起点，单位为秒，支持小数 |
 | `-e, --end` | 终点，单位为秒，支持小数 |
 | `--segments` | 多个片段，按顺序拼接，格式为 `起-止,起-止` |
-| `-o, --output` | 输出路径，支持 `.mp4`、`.m4a`、`.mov`、`.mkv` |
+| `-o, --output` | 输出路径；视频支持 `.mp4`、`.m4v`、`.mov`、`.mkv`，音频支持常见音频格式 |
 | `--out-dir` | 输出文件夹，文件名自动生成 |
 | `--fast` | 从起点之前最近的关键帧开始流复制 |
 | `--force-encode` | 强制重新编码 |
@@ -209,7 +209,7 @@ Clip Goat is designed around this workflow: it lists every recording in your Vid
 
 ### Fix uneven left and right channels
 
-Some recordings or videos sound louder on one side, or have sound on only one side. Merge the left and right channels, or send the clearer side to both ears, then preview and export. The processed audio is mono: both ears hear the same content, but stereo separation is lost.
+Some recordings or videos sound louder on one side, or have sound on only one side. Merge the left and right channels, or send the clearer side to both ears, then preview and export. The processed audio is mono: both ears hear the same content, **but stereo separation is lost**.
 
 <p align="center">
   <img src="docs/audio-channels-20261125-011455.jpg" width="860" alt="Viewing uneven left and right channel waveforms in the Clip Goat audio workbench" />
@@ -227,7 +227,7 @@ Cutting a dozen seconds out of a recording is a small job, but the usual ways of
 
 *Everything else is left out: no project to create, no timeline to arrange, no export settings to fill in, no file name to think up.*
 
-It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.
+**It is not a replacement for a video editor. It has no transitions, titles, colour tools or multi-track timeline.**
 
 ## Features
 
@@ -256,9 +256,9 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 
 Clips are saved next to the source video as `{original-name}_clip_{length}s.mp4`, for example `Game_clip_12.5s.mp4`; a number is appended if the name is taken.
 
-Audio-only clips default to `.m4a`, preserving every audio track. Stream copy is tried first; incompatible codecs fall back to AAC. Range selection, source metadata, renaming and undo work as for video. The preview shows the file name; the timeline has no video thumbnails or waveform. The workspace still starts in the system Videos folder; add a music folder manually.
+Audio-only clips default to the input format, for example MP3 to MP3. Stream copy is tried first; when re-encoding is needed, a codec supported by that format is used. Range selection, source metadata, renaming and undo work as for video. The preview shows the file name; the timeline has no video thumbnails or waveform. The workspace still starts in the system Videos folder; add a music folder manually.
 
-- **Channel workbench**: the audio preview shows live output waveforms for both ears. For videos with audio, use the buttons at the bottom of the preview to switch to the workbench. Pausing freezes the last sample, so you can compare the same frame across modes. Switch between Original, Merge L + R, Left only and Right only to hear the result immediately during playback. Settings apply to the whole file and all selected ranges. The last three modes export mono AAC, playing the same signal in both ears. Merge averages left and right; it is not automatic loudness matching, removes stereo separation, and can cancel out-of-phase sound. Video encoding still follows the keyframe rules.
+- **Channel workbench**: the audio preview shows live output waveforms for both ears. For videos with audio, use the buttons at the bottom of the preview to switch to the workbench. Pausing freezes the last sample, so you can compare the same frame across modes. Switch between Original, Merge L + R, Left only and Right only to hear the result immediately during playback. Settings apply to the whole file and all selected ranges. The last three modes re-encode audio as mono, playing the same signal in both ears. Merge averages left and right; it is not automatic loudness matching, removes stereo separation, and can cancel out-of-phase sound. Video encoding still follows the keyframe rules.
 - **Multiple tracks**: keep all tracks and preview track 1 by default, or select one track for both preview and export. Tracks are never mixed automatically. Channel processing supports mono or stereo; Right only requires a right channel. Surround audio can be exported unchanged.
 - The two chips to the left of the Export button show the destination and the export mode ("Instant" or "Exact"). Click the first to change the folder; click "Exact" to move the start onto a keyframe and export instantly.
 - When the pointer is over the preview, controls for play, back, forward, volume and speed appear. Right-click back or forward to change the skip amount; volume and speed affect the preview only.
@@ -295,7 +295,7 @@ On success the command prints the path of the exported file to standard output a
 | `-s, --start` | Start in seconds; decimals allowed |
 | `-e, --end` | End in seconds; decimals allowed |
 | `--segments` | Several ranges joined in order, written as `start-end,start-end` |
-| `-o, --output` | Output path; `.mp4`, `.m4a`, `.mov` and `.mkv` are supported |
+| `-o, --output` | Output path; video supports `.mp4`, `.m4v`, `.mov` and `.mkv`, audio supports common audio formats |
 | `--out-dir` | Output folder; the file name is generated automatically |
 | `--fast` | Stream copy from the nearest keyframe before the start |
 | `--force-encode` | Always re-encode |

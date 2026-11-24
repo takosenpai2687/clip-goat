@@ -15,6 +15,7 @@ interface ProbeStream {
   bit_rate?: string;
   duration?: string;
   channels?: number;
+  tags?: Record<string, string>;
   disposition?: { attached_pic?: number };
 }
 
@@ -58,7 +59,9 @@ export async function probe(file: string, { signal }: { signal?: AbortSignal } =
     startTime: Number(format.start_time) || 0,
     size: Number(format.size) || 0,
     format: format.format_name || '',
-    origin: parseOrigin(tags.comment || tags.COMMENT),
+    origin: [tags, ...audio.map((stream) => stream.tags || {})]
+      .map((entry) => parseOrigin(entry.comment || entry.COMMENT))
+      .find((origin) => origin !== null) || null,
     video: v ? {
       codec: v.codec_name || '',
       width: Number(v.width) || 0,
