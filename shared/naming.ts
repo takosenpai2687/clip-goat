@@ -1,10 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ClipLabel, Origin, Segment } from './types';
+import type { ClipLabel, Origin, Segment, VideoInfo } from './types';
 
 export const CLIP_MARKER = '_clip_';
 
 export const VIDEO_EXTS = ['.mp4', '.mkv', '.mov', '.webm', '.m4v', '.avi', '.ts', '.m2ts', '.flv', '.wmv', '.mpg', '.mpeg', '.3gp'];
+export const AUDIO_EXTS = ['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.opus', '.aiff', '.aif', '.wma'];
+export const MEDIA_EXTS = [...VIDEO_EXTS, ...AUDIO_EXTS];
+
+export function isMediaFile(filename: string): boolean {
+  return MEDIA_EXTS.includes(path.extname(String(filename)).toLowerCase());
+}
+
+export function defaultExtension(info: Pick<VideoInfo, 'video'>): string {
+  return info.video ? '.mp4' : '.m4a';
+}
 
 export function isVideoFile(filename: string): boolean {
   return VIDEO_EXTS.includes(path.extname(String(filename)).toLowerCase());

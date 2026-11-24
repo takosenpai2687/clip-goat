@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { Maximize2, Pause, Play, Plus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { AudioLines, Film, Maximize2, Pause, Play, Plus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import AudioStage from './components/AudioStage';
+import { supportsAudioMode } from '../../shared/audio';
 import TitleBar from './components/TitleBar';
 import Workspace, { siblingsOf, type Filter } from './components/Workspace';
 import Backdrop from './components/Backdrop';
@@ -13,7 +15,7 @@ import ExportBar, { type ExportState } from './components/ExportBar';
 import { I18nContext, STRINGS, defaultLang, errorText, type Lang, type Strings } from './lib/i18n';
 import { clamp, formatTime } from './lib/format';
 import { addAt, makeSegment, moveEdge, snapStarts, totalLength, type Edge, type Range } from './lib/segments';
-import type { ExportPlan, WorkspaceDir, MediaDoc, ProxyLevel, Segment, Theme } from '../../shared/types';
+import type { AudioSettings, ExportPlan, WorkspaceDir, MediaDoc, ProxyLevel, Segment, Theme } from '../../shared/types';
 
 /** How the preview is fed: the file itself, or a proxy built from it. */
 type Level = 'direct' | ProxyLevel;
@@ -26,6 +28,7 @@ interface LoadState {
 
 interface Naming {
   stem: string;
+  ext: string;
   dir: string;
 }
 
@@ -70,6 +73,7 @@ interface Live {
   load: LoadState;
   exp: ExportState;
   plan: ExportPlan;
+  audio: AudioSettings;
   t: Strings;
 }
 
@@ -99,6 +103,7 @@ const extOf = (name: string): string => (name.split('.').pop() ?? '').toLowerCas
 
 // How to feed the <video> tag: the file itself, a remuxed MP4, or a transcoded proxy.
 function firstLevel(doc: MediaDoc): Level {
+  if (!doc.info.video) return doc.info.audio.length > 1 ? 'remux' : 'direct';
   if (!PLAYABLE_CODECS.includes(doc.info.video.codec)) return 'transcode';
   return PLAYABLE_EXTS.includes(extOf(doc.name)) ? 'direct' : 'remux';
 }
@@ -135,6 +140,11 @@ export default function App() {
   const [view, setView] = useState<Segment>({ start: 0, end: 1 });
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [audio, setAudio] = useState<AudioSettings>({ mode: 'original' });
+  const [audioView, setAudioView] = useState(false);
+  const [audioActivated, setAudioActivated] = useState(false);
+  const [mediaElement, setMediaElement] = useState<HTMLVideoElement | null>(null);
+  const resumePreview = useRef<{ time: number; playing: boolean } | null>(null);
   const [plan, setPlan] = useState<ExportPlan>({ mode: 'encode', name: '', dir: '' });
   const [exp, setExp] = useState<ExportState>(IDLE);
   const [dropping, setDropping] = useState(false);
@@ -154,6 +164,12 @@ export default function App() {
 
   const t = STRINGS[lang];
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const bindVideo = useCallback((el: HTMLVideoElement | null) => {
+    if (el) {
+      videoRef.current = el;
+      setMediaElement(el);
+    }
+  }, []);
   const pendingSeek = useRef<number | null>(null);
   const previewing = useRef(false);
   const level = useRef<Level>('direct');
@@ -163,12 +179,13 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef(0);
   const undoStack = useRef<UndoEntry[]>([]);
-  live.current = { doc, naming, skip, roots, tempRoots, hidden, dest, segments, activeId, view, time, load, exp, plan, t };
+  live.current = { doc, naming, skip, roots, tempRoots, hidden, dest, segments, activeId, view, time, load, exp, plan, audio, t };
 
   const duration = doc ? doc.info.duration : 0;
-  const fps = doc ? doc.info.video.fps || 30 : 30;
+  const fps = doc?.info.video?.fps || 30;
   const minLen = Math.max(0.05, 1 / fps);
   const locked = exp.status === 'running';
+  const showAudio = Boolean(doc && (!doc.info.video || audioView));
 
   /* ---------- workspace ---------- */
 
@@ -313,16 +330,16 @@ export default function App() {
 
   /* ---------- loading a video ---------- */
 
-  const buildProxy = useCallback(async (target: MediaDoc, lvl: ProxyLevel, token: number): Promise<void> => {
+  const buildProxy = useCallback(async (target: MediaDoc, lvl: ProxyLevel, token: number, audioTrack?: number): Promise<void> => {
     level.current = lvl;
     setSrc(null);
     setLoad({ status: 'loading', percent: 0 });
     try {
-      const url = await api.proxy(target.path, lvl, target.info.duration);
+      const url = await api.proxy(target.path, lvl, target.info.duration, audioTrack);
       if (token === loadToken.current) setSrc(url);
     } catch (err) {
       if (token !== loadToken.current || codeOf(err) === 'ABORTED') return;
-      if (lvl === 'remux') buildProxy(target, 'transcode', token);
+      if (lvl === 'remux') buildProxy(target, 'transcode', token, audioTrack);
       else setLoad({ status: 'error', message: errorText(live.current.t, err, 'errPreview') });
     }
   }, []);
@@ -346,6 +363,10 @@ export default function App() {
         setView({ start: 0, end: target.info.duration });
         setTime(0);
         setPlaying(false);
+        setAudio({ mode: 'original' });
+        setAudioView(false);
+        setAudioActivated(false);
+        resumePreview.current = null;
         pendingSeek.current = null;
 
         const lvl = firstLevel(target);
@@ -374,9 +395,44 @@ export default function App() {
     const target = live.current.doc;
     if (!target) return;
     const next = nextLevel(target, level.current);
-    if (next) buildProxy(target, next, loadToken.current);
+    if (next) buildProxy(target, next, loadToken.current, live.current.audio.track);
     else setLoad({ status: 'error', message: live.current.t.errPreview });
   }, [buildProxy]);
+
+  const changeAudio = useCallback((next: AudioSettings) => {
+    const { doc: current, audio: previous, exp: state, t: text } = live.current;
+    if (!current || state.status === 'running') return;
+    const tracks = next.track === undefined ? current.info.audio : [current.info.audio[next.track]];
+    if (tracks.some((track) => !supportsAudioMode(next.mode, track.channels))) {
+      next = { ...next, mode: 'original' };
+      showToast(text.audioReset);
+    }
+    setAudio(next);
+    setExp(IDLE);
+    if (!current.info.video) setPlan((prev) => ({ ...prev, mode: next.mode === 'original' ? 'copy' : 'encode' }));
+    if ((next.track ?? 0) !== (previous.track ?? 0)) {
+      const media = videoRef.current;
+      resumePreview.current = { time: media?.currentTime ?? live.current.time, playing: Boolean(media && !media.paused) };
+      media?.pause();
+      setPlaying(false);
+      pendingSeek.current = null;
+      buildProxy(current, 'remux', ++loadToken.current, next.track);
+    }
+  }, [buildProxy, showToast]);
+
+  const showAudioView = useCallback(() => {
+    const { doc: current, exp: state } = live.current;
+    if (!current?.info.video || !current.info.audio.length || state.status === 'running') return;
+    setAudioView(true);
+    if (!audioActivated && current.info.audio.length > 1 && level.current === 'direct') {
+      const media = videoRef.current;
+      resumePreview.current = { time: media?.currentTime ?? live.current.time, playing: Boolean(media && !media.paused) };
+      media?.pause();
+      setPlaying(false);
+      buildProxy(current, 'remux', ++loadToken.current, 0);
+    }
+    setAudioActivated(true);
+  }, [audioActivated, buildProxy]);
 
   const pickFile = useCallback(async () => {
     const filePath = await api.openFile();
@@ -603,7 +659,7 @@ export default function App() {
       applySegments(next);
       if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
       // Half a frame inside the range, so the picture is the first (or last) frame the export will contain.
-      const half = 0.5 / (current.info.video.fps || 30);
+      const half = 0.5 / (current.info.video?.fps || 30);
       const shown = edge === 'start' ? seg.start + half : seg.end - half;
       seek(clamp(shown, 0, Math.max(0, current.info.duration - 0.01)));
     },
@@ -669,13 +725,14 @@ export default function App() {
     const { doc: current, segments: segs, exp: state, plan: currentPlan, t: text } = live.current;
     if (!current || state.status === 'running') return;
     if (videoRef.current) videoRef.current.pause();
-    setExp({ status: 'running', percent: 0, mode: currentPlan.mode });
+    setExp({ status: 'running', percent: 0, mode: live.current.audio.mode === 'original' ? currentPlan.mode : 'encode' });
     try {
       const result = await api.exportClip({
         input: current.path,
         segments: segs.map(({ start, end }) => ({ start, end })),
         outputDir: live.current.dest,
         name,
+        audio: current.info.audio.length ? live.current.audio : undefined,
       });
       setExp({ status: 'done', percent: 100, result });
       rescan();
@@ -690,7 +747,8 @@ export default function App() {
     const { doc: current, exp: state, plan: currentPlan } = live.current;
     if (!current || state.status === 'running' || state.status === 'done' || !currentPlan.name) return;
     if (videoRef.current) videoRef.current.pause();
-    setNaming({ stem: currentPlan.name.replace(/\.mp4$/i, ''), dir: currentPlan.dir || '' });
+    const dot = currentPlan.name.lastIndexOf('.');
+    setNaming({ stem: currentPlan.name.slice(0, dot), ext: currentPlan.name.slice(dot), dir: currentPlan.dir || '' });
   }, []);
   const confirmName = useCallback(
     (name: string) => {
@@ -714,14 +772,19 @@ export default function App() {
   // Ask the main process which path this export will take and what the file will be called.
   useEffect(() => {
     if (!doc || !segments.length) return undefined;
+    let active = true;
     const timer = setTimeout(() => {
       api
-        .plan(doc.path, segments.map(({ start, end }) => ({ start, end })), doc.info.video.fps, dest)
-        .then(setPlan)
-        .catch(() => {});
+        .plan(doc.path, segments.map(({ start, end }) => ({ start, end })), doc.info.video?.fps || 0, dest, doc.info.audio.length ? audio : undefined)
+        .then((next) => { if (active) setPlan(next); })
+        .catch((err) => {
+          if (!active) return;
+          setPlan({ mode: 'encode', name: '', dir: '' });
+          showToast(errorText(live.current.t, err, 'errExport'));
+        });
     }, 90);
-    return () => clearTimeout(timer);
-  }, [doc, segments, keyframes, trees, dest]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [doc, segments, keyframes, trees, dest, audio, showToast]);
 
   /* ---------- wiring ---------- */
 
@@ -830,8 +893,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const tag = (event.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || live.current.naming) return;
-      const { exp: state, doc: current, time: now } = live.current;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || live.current.naming) return;
+      const { exp: state, doc: current } = live.current;
       if (state.status === 'running') {
         if (event.key === 'Escape') cancelExport();
         return;
@@ -850,7 +913,6 @@ export default function App() {
       // A focused button keeps its own Space/Enter.
       if (tag === 'BUTTON' && (event.key === ' ' || event.key === 'Enter')) return;
 
-      const step = event.shiftKey ? 1 : 1 / (current.info.video.fps || 30);
       switch (event.key) {
         case ' ':
           event.preventDefault();
@@ -859,8 +921,7 @@ export default function App() {
         case 'ArrowLeft':
         case 'ArrowRight':
           event.preventDefault();
-          if (videoRef.current) videoRef.current.pause();
-          seek(clamp(now + (event.key === 'ArrowLeft' ? -step : step), 0, current.info.duration));
+          skipBy(event.key === 'ArrowLeft' ? -1 : 1);
           break;
         case 'm':
         case 'M':
@@ -918,7 +979,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mouseup', dropFocus);
     };
-  }, [togglePlay, skipBy, toggleMute, wakeStage, undo, seek, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
+  }, [togglePlay, skipBy, toggleMute, wakeStage, undo, markEdge, addRange, removeRange, requestExport, dismissResult, cancelExport, pickFile]);
 
   useEffect(() => {
     const hasFiles = (event: DragEvent): boolean => Boolean(event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files'));
@@ -1019,7 +1080,7 @@ export default function App() {
 
             <main className="main-area">
               <section
-                className={`stage${doc ? '' : ' is-empty glass'}${dropping ? ' is-dropping' : ''}`}
+                className={`stage${doc ? '' : ' is-empty glass'}${showAudio ? ' is-audio' : ''}${dropping ? ' is-dropping' : ''}`}
                 onPointerMove={wakeStage}
                 onPointerLeave={sleepStage}
               >
@@ -1027,15 +1088,24 @@ export default function App() {
                   {doc && src && (
                     <motion.video
                       key={src}
-                      ref={(el) => {
-                        if (el) videoRef.current = el;
-                      }}
+                      ref={bindVideo}
                       className="video"
+                      crossOrigin="anonymous"
                       src={src}
                       preload="auto"
                       playsInline
                       onClick={togglePlay}
-                      onLoadedData={(event) => (event.currentTarget.videoWidth ? setLoad({ status: 'ready' }) : escalate())}
+                      onLoadedData={(event) => {
+                        if (event.currentTarget !== videoRef.current) return;
+                        if (doc.info.video && !event.currentTarget.videoWidth) return escalate();
+                        setLoad({ status: 'ready' });
+                        const resume = resumePreview.current;
+                        if (resume) {
+                          resumePreview.current = null;
+                          event.currentTarget.currentTime = clamp(resume.time, 0, Math.max(0, duration - 0.01));
+                          if (resume.playing) event.currentTarget.play().catch(() => showToast(live.current.t.errPreview));
+                        }
+                      }}
                       onError={escalate}
                       onPlay={() => setPlaying(true)}
                       onPause={() => setPlaying(false)}
@@ -1049,11 +1119,17 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
+                {doc && doc.info.audio.length > 0 && (!doc.info.video || audioActivated) && (
+                  <AudioStage key={doc.path} doc={doc} media={mediaElement?.getAttribute('src') === src ? mediaElement : null} settings={audio} playing={playing}
+                    ready={load.status === 'ready'} locked={locked} visible={showAudio} theme={theme} onChange={changeAudio} onToggle={togglePlay} />
+                )}
+
                 {doc && load.status === 'ready' && <StageProgress visible={stageHot && !locked} time={time} duration={duration} onSeek={seek} />}
 
                 {doc && load.status === 'ready' && (
                   <StageControls
-                    visible={stageHot && !locked}
+                    visible={(stageHot || showAudio) && !locked}
+                    compact={showAudio}
                     playing={playing}
                     skip={skip}
                     onToggle={togglePlay}
@@ -1069,6 +1145,24 @@ export default function App() {
                     next={neighbours.next}
                     onOpen={openFile}
                   />
+                )}
+
+                {doc?.info.video && doc.info.audio.length > 0 && (
+                  <div className={`stage-view-switch${showAudio ? ' is-audio' : ''}`} role="group" aria-label={t.stageView} inert={locked}>
+                    <button type="button" aria-label={t.videoView} title={t.videoView} aria-pressed={!audioView} disabled={locked}
+                      onClick={() => setAudioView(false)}>
+                      {!audioView && <motion.span layoutId="stage-view-active" className="stage-view-active" transition={{ type: 'spring', stiffness: 440, damping: 34 }} />}
+                      <Film size={17} strokeWidth={1.7} aria-hidden="true" />
+                      <span className="stage-view-label">{t.videoViewShort}</span>
+                    </button>
+                    <button type="button" aria-label={t.audioView} title={t.audioView} aria-pressed={audioView}
+                      disabled={locked || load.status !== 'ready'} onClick={showAudioView}>
+                      {audioView && <motion.span layoutId="stage-view-active" className="stage-view-active" transition={{ type: 'spring', stiffness: 440, damping: 34 }} />}
+                      <AudioLines size={17} strokeWidth={1.7} aria-hidden="true" />
+                      <span className="stage-view-label">{t.audioViewShort}</span>
+                      {audio.mode !== 'original' && <span className="stage-view-dot" />}
+                    </button>
+                  </div>
                 )}
 
                 <AnimatePresence>
@@ -1163,10 +1257,10 @@ export default function App() {
                       </div>
 
                       <Timeline
-                        src={load.status === 'ready' ? src : null}
+                        src={load.status === 'ready' && doc.info.video ? src : null}
                         duration={duration}
                         fps={fps}
-                        aspect={doc.info.video.width / Math.max(1, doc.info.video.height)}
+                        aspect={doc.info.video ? doc.info.video.width / Math.max(1, doc.info.video.height) : 1}
                         view={view}
                         onView={setView}
                         segments={segments}
@@ -1183,6 +1277,8 @@ export default function App() {
                       segments={segments}
                       length={length}
                       plan={plan}
+                      audioProcessing={audio.mode !== 'original'}
+                      hasVideo={Boolean(doc.info.video)}
                       canSnap={Boolean(keyframes && keyframes.length)}
                       onSnap={snapToKeyframes}
                       dest={dest}
@@ -1202,7 +1298,7 @@ export default function App() {
           </div>
         </div>
         <AnimatePresence>
-          {naming && <NameDialog key="name" stem={naming.stem} ext=".mp4" dir={naming.dir} onConfirm={confirmName} onCancel={cancelName} />}
+          {naming && <NameDialog key="name" stem={naming.stem} ext={naming.ext} dir={naming.dir} onConfirm={confirmName} onCancel={cancelName} />}
         </AnimatePresence>
         <AnimatePresence>
           {toast && (

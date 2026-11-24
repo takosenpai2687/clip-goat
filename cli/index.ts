@@ -3,31 +3,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { clip, errorCode, errorMessage, type ClipError, type Segment } from '../shared';
+import { isAudioMode } from '../shared/audio';
 
 // Compiled to dist/cli, so the package manifest sits two folders up.
 const { version } = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8')) as { version: string };
 
-const HELP = `clip-goat ${version} - cut a range out of a video
+const HELP = `clip-goat ${version} - cut a range out of audio or video
 
 Usage:
   clip-goat --input <file> --start <sec> --end <sec> [options]
   clip-goat --input <file> --segments 10-15,42.5-48 [options]
 
 Options:
-  -i, --input <file>     Source video
+  -i, --input <file>     Source audio or video
   -s, --start <sec>      Start in seconds (decimals allowed)
   -e, --end <sec>        End in seconds (decimals allowed)
       --segments <list>  Several ranges joined in order: start-end,start-end
-  -o, --output <file>    Output path (.mp4/.mov/.mkv). Default: {name}_clip_{length}s.mp4 next to the input
+  -o, --output <file>    Output path (.mp4/.m4a/.mov/.mkv). Default: {name}_clip_{length}s.mp4 for video, .m4a for audio
       --out-dir <dir>    Keep the default file name but write it into this folder
       --fast             Stream copy from the keyframe at or before start (instant; may begin slightly early)
       --force-encode     Always re-encode, skip stream copy
+      --audio-mode <mode> original (default), mono (merge L/R), left or right (both ears)
+      --audio-track <n>  Keep only audio track n (1-based); default keeps all tracks
       --overwrite        Replace the output file if it exists
       --json             Print the result as JSON on stdout
   -h, --help
   -v, --version
 
 Default mode: stream copy when start sits on a keyframe, otherwise a frame-exact re-encode.
+Audio-only files do not need video keyframes; they use stream copy at audio packet boundaries.
 If stream copy fails, it falls back to re-encoding automatically.
 
 Exit codes: 0 success, 1 export failed, 2 bad arguments.`;
@@ -65,6 +69,8 @@ function readArgs() {
         'out-dir': { type: 'string' },
         fast: { type: 'boolean' },
         'force-encode': { type: 'boolean' },
+        'audio-mode': { type: 'string' },
+        'audio-track': { type: 'string' },
         overwrite: { type: 'boolean' },
         json: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
@@ -91,6 +97,10 @@ async function main(): Promise<void> {
   if (!values.input) fail('--input is required. Run "clip-goat --help" for usage.', 2);
   if (values.fast && values['force-encode']) fail('--fast and --force-encode cannot be combined.', 2);
   if (values.output && values['out-dir']) fail('Use either --output or --out-dir.', 2);
+  const audioMode = values['audio-mode'] ?? 'original';
+  if (!isAudioMode(audioMode)) fail('--audio-mode must be original, mono, left or right.', 2);
+  const audioTrack = values['audio-track'] === undefined ? undefined : Number(values['audio-track']) - 1;
+  if (audioTrack !== undefined && (!Number.isInteger(audioTrack) || audioTrack < 0)) fail('--audio-track must be a positive track number.', 2);
 
   let segments: Segment[];
   if (values.segments) {
@@ -110,6 +120,7 @@ async function main(): Promise<void> {
       outputDir: values['out-dir'],
       mode: values['force-encode'] ? 'encode' : values.fast ? 'copy' : 'auto',
       overwrite: values.overwrite,
+      audio: values['audio-mode'] !== undefined || audioTrack !== undefined ? { mode: audioMode, track: audioTrack } : undefined,
       onProgress: showProgress
         ? ({ percent, mode }) => process.stderr.write(`\r${mode === 'copy' ? 'copying' : 'encoding'} ${percent.toFixed(0)}%   `)
         : undefined,
@@ -119,7 +130,7 @@ async function main(): Promise<void> {
   } catch (err) {
     if (showProgress) process.stderr.write('\n');
     const code = errorCode(err) || '';
-    const badArgs = ['BAD_RANGE', 'BAD_INPUT', 'BAD_OUTPUT_PATH', 'NOT_FOUND', 'EXISTS'].includes(code);
+    const badArgs = ['BAD_RANGE', 'BAD_INPUT', 'BAD_AUDIO', 'BAD_OUTPUT_PATH', 'NOT_FOUND', 'EXISTS'].includes(code);
     const hint = code === 'EXISTS' ? ' (use --overwrite to replace it)' : '';
     const detail = (err as ClipError).detail;
     fail(detail ? `${errorMessage(err)}\n${detail}` : `${errorMessage(err)}${hint}`, badArgs ? 2 : 1);

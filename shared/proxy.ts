@@ -8,6 +8,8 @@ export interface ProxyOptions {
   output: string;
   level: ProxyLevel;
   duration: number;
+  audioOnly?: boolean;
+  audioTrack?: number;
   onProgress?: (p: { percent: number }) => void;
   signal?: AbortSignal;
 }
@@ -16,10 +18,15 @@ export interface ProxyOptions {
 //  level 'remux'     -> stream copy into MP4 (seconds; fixes container-only problems such as MKV)
 //  level 'transcode' -> 720p H.264 proxy (slower; fixes unsupported codecs)
 // Export always reads the original file, so the proxy never affects output quality.
-export async function makePreviewProxy({ input, output, level, duration, onProgress, signal }: ProxyOptions): Promise<string> {
-  const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats', '-i', input, '-map', '0:v:0', '-map', '0:a:0?'];
+export async function makePreviewProxy({ input, output, level, duration, audioOnly = false, audioTrack = 0, onProgress, signal }: ProxyOptions): Promise<string> {
+  if (!Number.isInteger(audioTrack) || audioTrack < 0) throw new ClipError('BAD_AUDIO', 'Invalid preview audio track.');
+  const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats', '-i', input];
+  if (!audioOnly) args.push('-map', '0:v:0');
+  args.push('-map', `0:a:${audioTrack}?`);
   if (level === 'remux') {
     args.push('-c', 'copy');
+  } else if (audioOnly) {
+    args.push('-c:a', 'aac', '-b:a', '192k');
   } else {
     args.push(
       '-vf', 'scale=-2:min(720\\,trunc(ih/2)*2)',

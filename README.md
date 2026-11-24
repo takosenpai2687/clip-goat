@@ -14,13 +14,23 @@ Clip Goat 是一个轻量且高效的视频高光摘取与素材整理工具，�
 
 Clip Goat 适用于"视频很长、需要的部分很短"的情况，例如游戏回放、屏幕录制、直播存档、监控录像和手机拍摄的素材。
 
+### 快速截取音视频片段
+
 以游戏回放为例：NVIDIA 即时重放这类功能每次保存最近一段固定时长的录像，一段 2 分钟的 4K60 录像约 700 MB，其中值得保留的部分通常只有十几秒。录像数量增长后难以查找，也占用大量磁盘空间。
 
 <p align="center">
-  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="用 Clip Goat 从一段 2 分钟的游戏回放中截取片段" />
+  <img src="docs/video-clipping.jpg" width="860" alt="在 Clip Goat 中预览游戏录像并选择要导出的片段" />
 </p>
 
 Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全部录像，截出需要的十几秒，再把原片移到回收站，把片段归到合适的文件夹。
+
+### 处理左右声道不一致
+
+有些录音或视频可能一边声音更大，甚至只有一边有声音。可以将左右声道合并，或选取较清晰的一边送到双耳，实时试听后再导出。处理后的声音为单声道，双耳内容相同，但不再保留立体声空间感。
+
+<p align="center">
+  <img src="docs/audio-channels.jpg" width="860" alt="在 Clip Goat 的声道工作台试听左右耳波形并合并声道" />
+</p>
 
 ## 为什么做 Clip Goat
 
@@ -30,7 +40,7 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 - **ffmpeg 命令行**速度快、不损画质，但需要自己找时间点、手写参数，操作时看不到画面。
 - **两者都不管截完之后的文件。** 原片和片段混在同一批文件夹里，很难分辨哪些录像已经处理过。
 
-> **Clip Goat 只做一件事：在视频上定一个起点和一个终点，然后快速导出这两点之间的片段。**
+> **Clip Goat 专注两件事：快速截取音视频，以及简单处理左右声道。**
 
 *其余的步骤都被省掉了：不用新建工程，不用铺时间线，不用填导出参数，不用给文件起名。*
 
@@ -45,7 +55,9 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 - 🔁 **片段可以再剪**：来源记录在文件元数据里，原视频删除后仍可继续剪
 - 🗂️ **工作区**：文件夹树，片段排在所属原片下方，支持搜索、移动、重命名和删除
 - 🗑️ **释放空间**：导出后可一键把原视频移到回收站
-- 🔊 **保留全部音轨**
+- 🔊 **声道处理**：合并左右声道，或将左声道 / 右声道送到双耳，支持实时试听
+- 🎚️ **多音轨**：默认保留全部音轨，也可选择单独一轨
+- 🎵 **音频剪辑**：MP3、M4A、AAC、WAV、FLAC、OGG、Opus、AIFF、WMA，与视频共用选区和拼接操作
 - 🎞️ **常见格式**：MP4、MKV、MOV、WebM、AVI、FLV 等
 - 📦 **内置 ffmpeg**：不需要另外安装
 - 🔄 **一键更新**：启动时自动检查新版本，也可以点标题栏的更新图标手动检查；确认后自动下载并安装
@@ -54,13 +66,17 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 
 ## 使用
 
-1. **打开**：把视频拖进窗口，或在左侧工作区里点击。
+1. **打开**：把音频或视频拖进窗口，或在左侧工作区里点击。
 2. **选取**：拖动时间轨两端的手柄。
 3. **导出**：按回车，确认文件名后再按一次回车。
-4. **清理**（可选）：导出后点"删除原视频"，把原片移到回收站。
+4. **清理**（可选）：导出后点"删除原文件"，把原片移到回收站。
 
 片段默认保存在原视频旁边，命名为 `{原文件名}_clip_{时长}s.mp4`，例如 `Game_clip_12.5s.mp4`，重名时自动加序号。
 
+纯音频默认导出为 `.m4a`，保留全部音轨；优先流复制，源编码不兼容时自动改为 AAC。起止时间、片段来源、重命名和撤销等逻辑与视频一致。音频预览显示文件名，时间轨不生成视频缩略图或波形，默认仍从系统“视频”文件夹开始，可手动添加音乐文件夹。
+
+- **声道工作台**：音频预览区显示左右耳的实时输出波形，带音轨的视频也可用预览区底部的按钮切换到声道工作台。暂停时保留最后采样，切换模式可对比同一帧；可选择“保持原样 / 左右合并 / 仅左声道 / 仅右声道”，播放时切换可立即试听，设置作用于整个文件和所有选区。后三种模式导出为单声道 AAC，让双耳播放同一份声音；“左右合并”各取一半，不是自动响度均衡，会失去立体声空间感，反相声音也可能抵消。视频是否重新编码仍由关键帧决定。
+- **多音轨**：默认保留全部音轨、试听第 1 轨；也可选择某一轨，此时试听和导出都只使用该轨。音轨不会自动混在一起。声道处理支持单声道或立体声；原文件没有右声道时，不能选择“仅右声道”。多声道环绕音频可保持原样导出。
 - 导出按钮左侧的两个标记分别显示导出位置和导出方式（"秒出"或"精确"）。点击前者可更改文件夹；点击"精确"可把起点对齐到关键帧，改为秒出。
 - 鼠标移到预览画面上时，会出现播放、后退、前进、音量和倍速控制。右键后退或前进按钮可更改跨度；音量和倍速只影响预览。
 - 起点手柄会吸附到附近的关键帧，按住 `Alt` 可关闭吸附。
@@ -73,13 +89,12 @@ Clip Goat 针对这个过程设计：启动后列出"视频"文件夹里的全�
 | `I` / `O` | 将起点 / 终点设为当前位置 |
 | `M` | 静音或取消静音 |
 | `↑` / `↓` | 调高 / 调低音量 |
-| `J` / `L` | 后退 / 前进一个跨度（默认 5 秒），不中断播放 |
-| `←` / `→` | 移动一帧，按住 `Shift` 移动 1 秒 |
+| `←` / `→`、`J` / `L` | 后退 / 前进一个跨度（默认 5 秒），不中断播放 |
 | `S` | 在当前位置切开片段；当前位置不在选区内时新增一个片段 |
 | `Delete` | 删除选中的片段 |
 | `回车` | 导出 |
 | `Esc` | 取消导出 |
-| `Ctrl+O` | 打开视频 |
+| `Ctrl+O` | 打开音频或视频 |
 | `Ctrl+Z` | 撤销上一次删除或重命名 |
 | 滚轮 | 缩放时间轨，按住 `Shift` 平移 |
 
@@ -93,24 +108,31 @@ clip-goat -i Game.mp4 -s 112.5 -e 115.8
 
 | 参数 | 说明 |
 |---|---|
-| `-i, --input` | 输入视频 |
+| `-i, --input` | 输入音频或视频 |
 | `-s, --start` | 起点，单位为秒，支持小数 |
 | `-e, --end` | 终点，单位为秒，支持小数 |
 | `--segments` | 多个片段，按顺序拼接，格式为 `起-止,起-止` |
-| `-o, --output` | 输出路径，支持 `.mp4`、`.mov`、`.mkv` |
+| `-o, --output` | 输出路径，支持 `.mp4`、`.m4a`、`.mov`、`.mkv` |
 | `--out-dir` | 输出文件夹，文件名自动生成 |
 | `--fast` | 从起点之前最近的关键帧开始流复制 |
 | `--force-encode` | 强制重新编码 |
+| `--audio-mode` | `original`（默认）、`mono`（左右合并）、`left`、`right`；后三种输出单声道 |
+| `--audio-track` | 只保留指定音轨，从 `1` 开始；不填保留全部音轨 |
 | `--overwrite` | 覆盖已存在的输出文件 |
 | `--json` | 以 JSON 格式输出结果 |
 
 不指定 `--fast` 或 `--force-encode` 时，行为与桌面应用相同：起点位于关键帧则流复制，否则重新编码。流复制失败时自动改为重新编码。
+
+纯音频不需要视频关键帧，按音频包边界流复制；导出时长偏差超过 0.1 秒时自动重新编码。需要更精确的起止时间时，CLI 可用 `--force-encode`。声道处理会重新编码音频；CLI 也可处理视频的音轨，画面是否重新编码仍按原来的关键帧规则决定。桌面端的音量和倍速只影响预览，声道工作台的设置则会应用到导出。
 
 示例：
 
 ```powershell
 clip-goat -i Game.mp4 --segments 10-15,42.5-48
 clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
+clip-goat -i Song.flac -s 10 -e 25.5
+clip-goat -i Song.flac -s 10 -e 25.5 --audio-mode mono
+clip-goat -i Recording.m4a -s 0 -e 30 --audio-track 2 --audio-mode left
 ```
 
 ## 已知限制
@@ -175,13 +197,23 @@ Clip Goat is a lightweight and efficient tool for pulling highlights out of vide
 
 Clip Goat suits any situation where the video is long and the part you need is short: game replays, screen recordings, stream archives, security footage, and footage shot on a phone.
 
+### Cut audio and video clips quickly
+
 Game replays are a typical example. Features such as NVIDIA Instant Replay save the last fixed stretch of gameplay each time. A 2-minute 4K60 recording is about 700 MB, and the part worth keeping is usually only a dozen seconds or so. As recordings pile up, they become hard to find and take up a lot of disk space.
 
 <p align="center">
-  <img src="docs/screenshot-20261122-230852.webp" width="860" alt="Cutting a clip out of a 2-minute game replay in Clip Goat" />
+  <img src="docs/video-clipping.jpg" width="860" alt="Previewing a game recording and selecting a clip in Clip Goat" />
 </p>
 
 Clip Goat is designed around this workflow: it lists every recording in your Videos folder on launch, cuts out the dozen seconds you need, then moves the original to the Recycle Bin and files the clip in the folder where it belongs.
+
+### Fix uneven left and right channels
+
+Some recordings or videos sound louder on one side, or have sound on only one side. Merge the left and right channels, or send the clearer side to both ears, then preview and export. The processed audio is mono: both ears hear the same content, but stereo separation is lost.
+
+<p align="center">
+  <img src="docs/audio-channels.jpg" width="860" alt="Previewing both ear waveforms and merging channels in the Clip Goat audio workbench" />
+</p>
 
 ## Why Clip Goat
 
@@ -191,7 +223,7 @@ Cutting a dozen seconds out of a recording is a small job, but the usual ways of
 - **The ffmpeg command line** is fast and lossless, but you have to find the timestamps yourself, write the arguments by hand, and you cannot see the picture while doing it.
 - **Neither helps with the files afterwards.** Originals and clips end up mixed in the same folders, and it is hard to tell which recordings have already been dealt with.
 
-> **Clip Goat does one thing: you set a start point and an end point in a video, and it quickly exports the part between them as a new file.**
+> **Clip Goat focuses on two things: quickly cutting audio/video and simply adjusting left and right channels.**
 
 *Everything else is left out: no project to create, no timeline to arrange, no export settings to fill in, no file name to think up.*
 
@@ -206,7 +238,9 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 - 🔁 **Clips of clips**: the source is recorded in the file metadata, so clips can be cut again even after the original is deleted
 - 🗂️ **Workspace**: a folder tree with clips listed under the video they came from; search, move, rename and delete
 - 🗑️ **Free up space**: move the original to the Recycle Bin in one click after an export
-- 🔊 **All audio tracks kept**
+- 🔊 **Channel processing**: merge left and right or send either channel to both ears, with live preview
+- 🎚️ **Multiple audio tracks**: keep all tracks by default or select one
+- 🎵 **Audio clipping**: MP3, M4A, AAC, WAV, FLAC, OGG, Opus, AIFF and WMA, with the same range and joining controls as video
 - 🎞️ **Common formats**: MP4, MKV, MOV, WebM, AVI, FLV and more
 - 📦 **Bundled ffmpeg**: no separate installation
 - 🔄 **One-click updates**: checks for a new version on launch, or on demand from the update icon in the title bar; downloads and installs it once you confirm
@@ -215,13 +249,17 @@ It is not a replacement for a video editor. It has no transitions, titles, colou
 
 ## Usage
 
-1. **Open**: drop a video onto the window, or click one in the workspace on the left.
+1. **Open**: drop audio or video onto the window, or click a file in the workspace on the left.
 2. **Select**: drag the handles at either end of the timeline.
 3. **Export**: press Enter, confirm the file name, and press Enter again.
 4. **Clean up** (optional): after the export, click "Delete original" to move the original to the Recycle Bin.
 
 Clips are saved next to the source video as `{original-name}_clip_{length}s.mp4`, for example `Game_clip_12.5s.mp4`; a number is appended if the name is taken.
 
+Audio-only clips default to `.m4a`, preserving every audio track. Stream copy is tried first; incompatible codecs fall back to AAC. Range selection, source metadata, renaming and undo work as for video. The preview shows the file name; the timeline has no video thumbnails or waveform. The workspace still starts in the system Videos folder; add a music folder manually.
+
+- **Channel workbench**: the audio preview shows live output waveforms for both ears. For videos with audio, use the buttons at the bottom of the preview to switch to the workbench. Pausing freezes the last sample, so you can compare the same frame across modes. Switch between Original, Merge L + R, Left only and Right only to hear the result immediately during playback. Settings apply to the whole file and all selected ranges. The last three modes export mono AAC, playing the same signal in both ears. Merge averages left and right; it is not automatic loudness matching, removes stereo separation, and can cancel out-of-phase sound. Video encoding still follows the keyframe rules.
+- **Multiple tracks**: keep all tracks and preview track 1 by default, or select one track for both preview and export. Tracks are never mixed automatically. Channel processing supports mono or stereo; Right only requires a right channel. Surround audio can be exported unchanged.
 - The two chips to the left of the Export button show the destination and the export mode ("Instant" or "Exact"). Click the first to change the folder; click "Exact" to move the start onto a keyframe and export instantly.
 - When the pointer is over the preview, controls for play, back, forward, volume and speed appear. Right-click back or forward to change the skip amount; volume and speed affect the preview only.
 - The start handle snaps to nearby keyframes; hold `Alt` to turn snapping off.
@@ -234,13 +272,12 @@ Clips are saved next to the source video as `{original-name}_clip_{length}s.mp4`
 | `I` / `O` | Set the start / end to the current position |
 | `M` | Mute or unmute |
 | `↑` / `↓` | Raise / lower the volume |
-| `J` / `L` | Jump back / ahead by the skip amount (5 seconds by default) without stopping playback |
-| `←` / `→` | Move one frame; hold `Shift` to move 1 second |
+| `←` / `→`, `J` / `L` | Jump back / ahead by the skip amount (5 seconds by default) without stopping playback |
 | `S` | Split the range at the current position; outside a range, add a new one |
 | `Delete` | Remove the selected range |
 | `Enter` | Export |
 | `Esc` | Cancel the export |
-| `Ctrl+O` | Open a video |
+| `Ctrl+O` | Open audio or video |
 | `Ctrl+Z` | Undo the last delete or rename |
 | Mouse wheel | Zoom the timeline; hold `Shift` to pan |
 
@@ -254,24 +291,31 @@ On success the command prints the path of the exported file to standard output a
 
 | Option | Description |
 |---|---|
-| `-i, --input` | Input video |
+| `-i, --input` | Input audio or video |
 | `-s, --start` | Start in seconds; decimals allowed |
 | `-e, --end` | End in seconds; decimals allowed |
 | `--segments` | Several ranges joined in order, written as `start-end,start-end` |
-| `-o, --output` | Output path; `.mp4`, `.mov` and `.mkv` are supported |
+| `-o, --output` | Output path; `.mp4`, `.m4a`, `.mov` and `.mkv` are supported |
 | `--out-dir` | Output folder; the file name is generated automatically |
 | `--fast` | Stream copy from the nearest keyframe before the start |
 | `--force-encode` | Always re-encode |
+| `--audio-mode` | `original` (default), `mono` (merge L/R), `left` or `right`; the last three output mono |
+| `--audio-track` | Keep only this audio track, starting at `1`; omitted keeps all tracks |
 | `--overwrite` | Overwrite an existing output file |
 | `--json` | Print the result as JSON |
 
 Without `--fast` or `--force-encode`, the behaviour matches the desktop app: stream copy when the start sits on a keyframe, re-encode otherwise. If stream copy fails, it falls back to re-encoding.
+
+Audio-only files do not need video keyframes and are copied at audio packet boundaries; a duration mismatch above 0.1 seconds triggers re-encoding. Use `--force-encode` in the CLI for more precise cuts. Channel processing re-encodes the audio. The CLI can also process a video's audio tracks; the original keyframe rules still decide whether the picture needs re-encoding. Desktop volume and speed affect preview only; channel workbench settings also affect exports.
 
 Examples:
 
 ```powershell
 clip-goat -i Game.mp4 --segments 10-15,42.5-48
 clip-goat -i Game.mp4 -s 112.5 -e 115.8 --out-dir D:\clips --json
+clip-goat -i Song.flac -s 10 -e 25.5
+clip-goat -i Song.flac -s 10 -e 25.5 --audio-mode mono
+clip-goat -i Recording.m4a -s 0 -e 30 --audio-track 2 --audio-mode left
 ```
 
 ## Known limitations

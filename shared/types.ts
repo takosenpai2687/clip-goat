@@ -8,6 +8,14 @@ export type ClipMode = 'auto' | 'copy' | 'encode';
 /** How a clip was (or will be) made. */
 export type ExportMode = 'copy' | 'encode';
 
+export type AudioMode = 'original' | 'mono' | 'left' | 'right';
+
+export interface AudioSettings {
+  mode: AudioMode;
+  /** Zero-based audio stream; omitted keeps all streams (preview uses the first). */
+  track?: number;
+}
+
 /** Where a clip came from: the original video's file name and ranges on its timeline. */
 export interface Origin {
   source: string;
@@ -20,7 +28,7 @@ export interface VideoInfo {
   size: number;
   format: string;
   origin: Origin | null;
-  video: { codec: string; width: number; height: number; fps: number; pixFmt: string; bitrate: number };
+  video: { codec: string; width: number; height: number; fps: number; pixFmt: string; bitrate: number } | null;
   audio: { codec: string; channels: number }[];
 }
 
@@ -83,6 +91,7 @@ export interface ExportJob {
   segments: Segment[];
   outputDir?: string | null;
   name?: string;
+  audio?: AudioSettings;
 }
 
 export type ProxyLevel = 'remux' | 'transcode';
@@ -118,9 +127,9 @@ export interface ClipGoatApi {
   restoreFile(filePath: string): Promise<string>;
   probe(filePath: string): Promise<MediaDoc>;
   keyframes(filePath: string, startTime: number): Promise<number[]>;
-  proxy(filePath: string, level: ProxyLevel, duration: number): Promise<string>;
+  proxy(filePath: string, level: ProxyLevel, duration: number, audioTrack?: number): Promise<string>;
   cancelProxy(): Promise<void>;
-  plan(input: string, segments: Segment[], fps: number, outputDir: string | null): Promise<ExportPlan>;
+  plan(input: string, segments: Segment[], fps: number, outputDir: string | null, audio?: AudioSettings): Promise<ExportPlan>;
   exportClip(job: ExportJob): Promise<ClipResult>;
   cancelExport(): Promise<void>;
   showInFolder(filePath: string): Promise<void>;

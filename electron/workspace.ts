@@ -14,7 +14,7 @@ function fail(message: string, code: string): never {
 
 const byName = (a: { name: string }, b: { name: string }): number => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 
-// Returns a folder node, or null when the folder holds no video anywhere below it.
+// Returns a folder node, or null when the folder holds no media anywhere below it.
 async function scanDir(dir: string, depth: number, budget: { left: number }, hidden: Set<string>): Promise<WorkspaceDir | null> {
   let entries: fs.Dirent[];
   try {
@@ -32,7 +32,7 @@ async function scanDir(dir: string, depth: number, budget: { left: number }, hid
       if (depth >= MAX_DEPTH || SKIP_DIRS.has(entry.name) || hidden.has(full.toLowerCase())) continue;
       const child = await scanDir(full, depth + 1, budget, hidden);
       if (child) dirs.push(child);
-    } else if (entry.isFile() && shared.isVideoFile(entry.name)) {
+    } else if (entry.isFile() && shared.isMediaFile(entry.name)) {
       try {
         const stat = await fs.promises.stat(full);
         files.push({
@@ -89,12 +89,12 @@ export async function scanWorkspace(roots: string[], hiddenDirs: string[] = []):
   return trees;
 }
 
-export function assertVideo(filePath: string): void {
-  if (!shared.isVideoFile(filePath) || !fs.existsSync(filePath)) fail('Not a video file.', 'NOT_FOUND');
+export function assertMedia(filePath: string): void {
+  if (!shared.isMediaFile(filePath) || !fs.existsSync(filePath)) fail('Not an audio/video file.', 'NOT_FOUND');
 }
 
 export async function moveFile(src: string, destDir: string): Promise<string> {
-  assertVideo(src);
+  assertMedia(src);
   if (!fs.statSync(destDir).isDirectory()) throw new Error('Destination is not a folder.');
   if (path.resolve(path.dirname(src)) === path.resolve(destDir)) return src;
   const target = shared.uniquePath(path.join(destDir, path.basename(src)));
@@ -109,7 +109,7 @@ export async function moveFile(src: string, destDir: string): Promise<string> {
 }
 
 export async function renameFile(src: string, stem: string): Promise<string> {
-  assertVideo(src);
+  assertMedia(src);
   const clean = String(stem).trim();
   if (!clean || BAD_NAME.test(clean) || clean.endsWith('.')) fail('That name is not allowed.', 'BAD_NAME');
   const target = path.join(path.dirname(src), clean + path.extname(src));
@@ -166,7 +166,7 @@ function findInBin(original: string): BinEntry | null {
 // Puts a file that was sent to the Recycle Bin back where it was.
 // Windows keeps each deleted file as a pair: $I<id> (where it came from) and $R<id> (the data).
 export async function restoreFile(original: string): Promise<string> {
-  if (!shared.isVideoFile(original)) fail('Not a video file.', 'NOT_FOUND');
+  if (!shared.isMediaFile(original)) fail('Not an audio/video file.', 'NOT_FOUND');
   if (process.platform !== 'win32') fail('Undo delete is only available on Windows.', 'RESTORE_FAILED');
   if (fs.existsSync(original)) fail('A file with that name already exists.', 'EXISTS');
 

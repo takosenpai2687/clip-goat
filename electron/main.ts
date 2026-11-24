@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import * as shared from '../shared';
-import type { ApiEvents, ExportJob, ExportPlan, MediaDoc, Origin, ProxyLevel, Segment, Theme } from '../shared';
+import type { ApiEvents, AudioSettings, ExportJob, ExportPlan, MediaDoc, VideoInfo, ProxyLevel, Segment, Theme } from '../shared';
 import * as workspace from './workspace';
 import { createUpdater } from './updater';
 
@@ -19,6 +19,16 @@ const MIME: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.webm': 'video/webm',
   '.mkv': 'video/x-matroska',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.aiff': 'audio/aiff',
+  '.aif': 'audio/aiff',
+  '.wma': 'audio/x-ms-wma',
 };
 // The caption-button strip is transparent so the app's own backdrop shows through it.
 const TITLEBAR: Record<Theme, { color: string; symbolColor: string; background: string }> = {
@@ -32,7 +42,7 @@ let pendingFile: string | null = null;
 let exportJob: AbortController | null = null;
 let proxyJob: AbortController | null = null;
 const keyframeCache = new Map<string, { mtime: number; times: number[] }>();
-const origins = new Map<string, Origin | null>();
+const mediaInfo = new Map<string, VideoInfo>();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } },
@@ -46,7 +56,7 @@ function mediaUrl(filePath: string): string {
 async function serveMedia(request: Request): Promise<Response> {
   const filePath = decodeURIComponent(new URL(request.url).pathname.slice(1));
   const inPreviewDir = path.dirname(filePath) === PREVIEW_DIR;
-  if (!inPreviewDir && !shared.isVideoFile(filePath)) return new Response('Forbidden', { status: 403 });
+  if (!inPreviewDir && !shared.isMediaFile(filePath)) return new Response('Forbidden', { status: 403 });
 
   let stat: fs.Stats;
   try {
@@ -126,14 +136,14 @@ function cachedKeyframes(filePath: string): number[] | null {
 }
 
 function initialFile(argv: string[]): string | null {
-  return argv.slice(1).find((arg) => !arg.startsWith('-') && shared.isVideoFile(arg) && fs.existsSync(arg)) || null;
+  return argv.slice(1).find((arg) => !arg.startsWith('-') && shared.isMediaFile(arg) && fs.existsSync(arg)) || null;
 }
 
 function registerIpc(): void {
   handle('dialog:openFile', async () => {
     const options: Electron.OpenDialogOptions = {
       properties: ['openFile'],
-      filters: [{ name: 'Video', extensions: shared.VIDEO_EXTS.map((e) => e.slice(1)) }],
+      filters: [{ name: 'Audio / Video', extensions: shared.MEDIA_EXTS.map((e) => e.slice(1)) }],
     };
     const res = await (win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options));
     return res.canceled ? null : res.filePaths[0];
@@ -156,24 +166,30 @@ function registerIpc(): void {
   handle('fs:rename', (src: string, stem: string) => workspace.renameFile(src, stem));
   handle('fs:restore', (filePath: string) => workspace.restoreFile(filePath));
   handle('fs:trash', async (filePath: string) => {
-    workspace.assertVideo(filePath);
+    workspace.assertMedia(filePath);
     await shell.trashItem(filePath);
   });
 
   handle('media:probe', async (filePath: string): Promise<MediaDoc> => {
     const info = await shared.probe(filePath);
-    origins.set(filePath, info.origin);
+    mediaInfo.set(filePath, info);
     return { path: filePath, name: path.basename(filePath), dir: path.dirname(filePath), url: mediaUrl(filePath), info };
   });
 
-  handle('media:keyframes', (filePath: string, startTime: number) => getKeyframes(filePath, startTime));
+  handle('media:keyframes', (filePath: string, startTime: number) => {
+    if (mediaInfo.get(filePath)?.video === null) return [];
+    return getKeyframes(filePath, startTime);
+  });
 
-  handle('media:proxy', async (filePath: string, level: ProxyLevel, duration: number) => {
+  handle('media:proxy', async (filePath: string, level: ProxyLevel, duration: number, audioTrack?: number) => {
+    const info = mediaInfo.get(filePath);
+    if (!info) fail('Open the media file before building a preview.', 'BAD_INPUT');
+    if (audioTrack !== undefined) shared.validateAudioSettings(info, { mode: 'original', track: audioTrack });
     if (proxyJob) proxyJob.abort();
     const controller = new AbortController();
     proxyJob = controller;
     const stat = await fs.promises.stat(filePath);
-    const hash = crypto.createHash('sha1').update(`${filePath}|${stat.mtimeMs}|${level}`).digest('hex').slice(0, 16);
+    const hash = crypto.createHash('sha1').update(`${filePath}|${stat.mtimeMs}|${level}|${audioTrack ?? 0}`).digest('hex').slice(0, 16);
     const output = path.join(PREVIEW_DIR, `${hash}.mp4`);
     try {
       if (!fs.existsSync(output)) {
@@ -184,6 +200,8 @@ function registerIpc(): void {
           output: tmp,
           level,
           duration,
+          audioOnly: mediaInfo.get(filePath)?.video === null,
+          audioTrack,
           signal: controller.signal,
           onProgress: ({ percent }) => send('media:proxy-progress', { path: filePath, percent }),
         });
@@ -200,20 +218,25 @@ function registerIpc(): void {
   });
 
   // Same decision the export will make, so the UI can show "instant / exact" and the file name up front.
-  handle('export:plan', (input: string, segments: Segment[], fps: number, outputDir: string | null): ExportPlan => {
-    const plan = shared.planSegments(segments, cachedKeyframes(input), 'auto', fps);
+  handle('export:plan', (input: string, segments: Segment[], fps: number, outputDir: string | null, audio?: AudioSettings): ExportPlan => {
+    const info = mediaInfo.get(input);
+    if (!info) fail('Open the media file before planning an export.', 'BAD_INPUT');
+    shared.validateAudioSettings(info, audio);
+    const plan = shared.planSegments(segments, cachedKeyframes(input), 'auto', fps, Boolean(info.video));
     const dir = outputDir || path.dirname(input);
-    const origin = shared.lineage(origins.get(input), input, plan.segments);
-    const output = shared.uniquePath(path.join(dir, shared.buildClipName(origin.source, origin.segments)));
-    return { mode: plan.mode, name: path.basename(output), dir };
+    const origin = shared.lineage(info.origin, input, plan.segments);
+    const output = shared.uniquePath(path.join(dir, shared.buildClipName(origin.source, origin.segments, shared.defaultExtension(info))));
+    return { mode: !info.video && audio && audio.mode !== 'original' ? 'encode' : plan.mode, name: path.basename(output), dir };
   });
 
-  handle('export:start', async ({ input, segments, outputDir, name }: ExportJob) => {
-    // A name chosen in the dialog keeps the .mp4 extension and never replaces an existing file.
+  handle('export:start', async ({ input, segments, outputDir, name, audio }: ExportJob) => {
+    // A name chosen in the dialog keeps the media's default extension and never replaces an existing file.
     let output: string | undefined;
     if (name) {
       if (/[\\/:*?"<>|]/.test(name) || name.endsWith('.')) fail('That name is not allowed.', 'BAD_NAME');
-      output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}.mp4`));
+      const info = mediaInfo.get(input);
+      if (!info) fail('Open the media file before exporting.', 'BAD_INPUT');
+      output = shared.uniquePath(path.join(outputDir || path.dirname(input), `${name}${shared.defaultExtension(info)}`));
     }
     if (exportJob) fail('An export is already running.', 'BUSY');
     const job = new AbortController();
@@ -225,6 +248,7 @@ function registerIpc(): void {
         output,
         outputDir: outputDir || undefined,
         mode: 'auto',
+        audio,
         keyframes: cachedKeyframes(input) || undefined,
         signal: job.signal,
         onProgress: (p) => send('export:progress', p),
@@ -329,7 +353,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('open-file', (event, filePath) => {
     event.preventDefault();
-    if (!shared.isVideoFile(filePath)) return;
+    if (!shared.isMediaFile(filePath)) return;
     if (win) send('app:open-file', filePath);
     else pendingFile = filePath;
   });

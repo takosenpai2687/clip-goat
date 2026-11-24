@@ -1,7 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { isClippedFile, buildClipName, uniquePath, planSegments, validateSegments, encodeOrigin, parseOrigin, lineage } from '../shared';
+import fs from 'node:fs';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { isClippedFile, buildClipName, uniquePath, planSegments, validateSegments, encodeOrigin, parseOrigin, lineage, clip, probe, ffmpegPath, makePreviewProxy, type AudioMode } from '../shared';
+
+function toneAmplitudes(file: string): number[] {
+  const pcm = execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-t', '0.5', '-f', 'f32le', '-ar', '48000', '-ac', '1', 'pipe:1']);
+  return [440, 880].map((frequency) => {
+    let real = 0;
+    let imaginary = 0;
+    for (let i = 4800; i < 24000; i++) {
+      const sample = pcm.readFloatLE(i * 4);
+      real += sample * Math.cos(2 * Math.PI * frequency * i / 48000);
+      imaginary += sample * Math.sin(2 * Math.PI * frequency * i / 48000);
+    }
+    return Math.hypot(real, imaginary) * 2 / 19200;
+  });
+}
 
 test('isClippedFile looks only at the _clip_ marker in the file name', () => {
   assert.equal(isClippedFile('Game_20261122_1430_clip_112.5s-115.8s.mp4'), true);
@@ -81,4 +98,103 @@ test('lineage: a clip cut from a clip points back to the original video', () => 
   ]);
   assert.deepEqual(lineage(null, path.join('videos', 'Game.mp4'), [{ start: 1, end: 2 }]), { source: 'Game.mp4', segments: [{ start: 1, end: 2 }] });
   assert.equal(parseOrigin('some other comment'), null);
+});
+
+test('audio clips preserve all tracks, join ranges and can be cut again', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-audio-'));
+  try {
+    const input = path.join(dir, 'song.m4a');
+    execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=6',
+      '-f', 'lavfi', '-i', 'sine=frequency=880:duration=6', '-map', '0:a', '-map', '1:a', '-c:a', 'aac', input]);
+    const result = await clip({ input, segments: [{ start: 0.5, end: 1.5 }, { start: 3, end: 5 }] });
+    const info = await probe(result.output);
+    assert.equal(path.basename(result.output), 'song_clip_3s.m4a');
+    assert.equal(result.mode, 'copy');
+    assert.equal(info.video, null);
+    assert.equal(info.audio.length, 2);
+    assert.ok(Math.abs(info.duration - 3) < 0.15, `Expected 3 seconds, got ${info.duration}`);
+    const recut = await clip({ input: result.output, segments: [{ start: 0.25, end: 0.75 }], mode: 'encode' });
+    assert.equal(path.basename(recut.output), 'song_clip_0.5s.m4a');
+    assert.deepEqual((await probe(recut.output)).origin, { source: 'song.m4a', segments: [{ start: 0.75, end: 1.25 }] });
+    assert.equal((await probe(recut.output)).audio.length, 2);
+    const joined = await clip({
+      input,
+      segments: Array.from({ length: 12 }, (_, i) => ({ start: i * 0.4, end: i * 0.4 + 0.25 })),
+      mode: 'encode',
+    });
+    const joinedInfo = await probe(joined.output);
+    assert.ok(Math.abs(joinedInfo.duration - 3) < 0.05, `Expected 3 seconds, got ${joinedInfo.duration}`);
+    assert.equal(joinedInfo.audio.length, 2);
+    const selected = await clip({ input, segments: [{ start: 0, end: 2 }], audio: { mode: 'left', track: 1 } });
+    const selectedInfo = await probe(selected.output);
+    assert.equal(selectedInfo.audio.length, 1);
+    assert.equal(selectedInfo.audio[0].channels, 1);
+    const selectedTones = toneAmplitudes(selected.output);
+    assert.ok(selectedTones[1] > 0.05 && selectedTones[0] < 0.005, 'Export must use track 2 (880 Hz), not track 1');
+    const selectedCopy = await clip({ input, segments: [{ start: 0, end: 2 }], audio: { mode: 'original', track: 1 } });
+    assert.equal(selectedCopy.mode, 'copy');
+    assert.equal((await probe(selectedCopy.output)).audio.length, 1);
+    const preview = path.join(dir, 'selected-preview.mp4');
+    await makePreviewProxy({ input, output: preview, level: 'transcode', audioOnly: true, audioTrack: 1, duration: 6 });
+    assert.equal((await probe(preview)).audio.length, 1);
+    const previewTones = toneAmplitudes(preview);
+    assert.ok(previewTones[1] > 0.05 && previewTones[0] < 0.005, 'Preview must use the same selected track as export');
+    await assert.rejects(clip({ input, segments: [{ start: 0, end: 1 }], audio: { mode: 'right', track: 0 } }), { code: 'BAD_AUDIO' });
+    await assert.rejects(clip({ input, segments: [{ start: 0, end: 1 }], audio: { mode: 'original', track: 2 } }), { code: 'BAD_AUDIO' });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('channel modes write mono with the intended signal, including joined ranges', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-channels-'));
+  try {
+    const input = path.join(dir, 'stereo.wav');
+    execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i',
+      'aevalsrc=0.3*sin(2*PI*440*t)|0.1*sin(2*PI*880*t):s=48000:d=3', input]);
+    for (const mode of ['mono', 'left', 'right'] satisfies AudioMode[]) {
+      const result = await clip({ input, segments: [{ start: 0.25, end: 0.75 }, { start: 1.25, end: 2.25 }], audio: { mode } });
+      assert.equal(result.mode, 'encode');
+      assert.ok(Math.abs(result.duration - 1.5) < 0.05);
+      assert.equal((await probe(result.output)).audio[0].channels, 1);
+      const tones = toneAmplitudes(result.output);
+      const expected = mode === 'mono' ? [0.15, 0.05] : mode === 'left' ? [0.3, 0] : [0, 0.1];
+      tones.forEach((amplitude, i) => assert.ok(Math.abs(amplitude - expected[i]) < 0.015, `${mode}: ${i} amplitude ${amplitude}`));
+    }
+    const video = path.join(dir, 'video.mp4');
+    execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=160x90:r=30:d=1',
+      '-i', input, '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', video]);
+    const processed = await clip({ input: video, segments: [{ start: 0, end: 1 }], audio: { mode: 'right' } });
+    const videoHash = (file: string) => execFileSync(ffmpegPath(), ['-v', 'error', '-i', file, '-map', '0:v:0',
+      '-c', 'copy', '-f', 'hash', '-hash', 'md5', 'pipe:1'], { encoding: 'utf8' });
+    assert.equal(videoHash(processed.output), videoHash(video), 'Channel processing must not re-encode copyable video');
+    assert.equal((await probe(processed.output)).audio[0].channels, 1);
+    const processedTones = toneAmplitudes(processed.output);
+    assert.ok(processedTones[1] > 0.05 && processedTones[0] < 0.005, 'Copied video must still get the requested audio effect');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio copy with excessive seek preroll falls back to AAC and can build a preview', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-goat-audio-'));
+  try {
+    const input = path.join(dir, 'recording.ogg');
+    execFileSync(ffmpegPath(), ['-v', 'error', '-f', 'lavfi', '-i', 'sine=duration=4', '-ac', '2', '-c:a', 'libvorbis', input]);
+    const result = await clip({ input, segments: [{ start: 0.5, end: 2.5 }] });
+    const info = await probe(result.output);
+    assert.equal(result.fellBack, true);
+    assert.equal(result.mode, 'encode');
+    assert.equal(info.video, null);
+    assert.equal(info.audio[0].codec, 'aac');
+    assert.equal(info.audio[0].channels, 2);
+    assert.ok(Math.abs(info.duration - 2) < 0.1);
+    const preview = path.join(dir, 'preview.mp4');
+    await makePreviewProxy({ input, output: preview, level: 'transcode', audioOnly: true, duration: 4 });
+    const previewInfo = await probe(preview);
+    assert.equal(previewInfo.video, null);
+    assert.equal(previewInfo.audio[0].codec, 'aac');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -40,15 +40,16 @@ export async function probe(file: string, { signal }: { signal?: AbortSignal } =
     data = JSON.parse(stdout) as ProbeData;
   } catch {}
   if (code !== 0 || !data || !data.format) {
-    throw new ClipError('PROBE_FAILED', 'Cannot read this file. It may be damaged or not a video.', stderr.trim());
+    throw new ClipError('PROBE_FAILED', 'Cannot read this file. It may be damaged or not audio/video.', stderr.trim());
   }
 
   const format = data.format;
   const streams = data.streams || [];
   const v = streams.find((s) => s.codec_type === 'video' && !(s.disposition && s.disposition.attached_pic));
-  if (!v) throw new ClipError('NO_VIDEO', 'This file has no video stream.');
+  const audio = streams.filter((s) => s.codec_type === 'audio');
+  if (!v && !audio.length) throw new ClipError('NO_VIDEO', 'This file has no audio or video stream.');
 
-  const duration = Number(format.duration) || Number(v.duration) || 0;
+  const duration = Number(format.duration) || Number(v?.duration) || Math.max(0, ...audio.map((s) => Number(s.duration) || 0));
   if (!(duration > 0)) throw new ClipError('PROBE_FAILED', 'Cannot read the duration of this file. It may be damaged.');
 
   const tags = format.tags || {};
@@ -58,15 +59,15 @@ export async function probe(file: string, { signal }: { signal?: AbortSignal } =
     size: Number(format.size) || 0,
     format: format.format_name || '',
     origin: parseOrigin(tags.comment || tags.COMMENT),
-    video: {
+    video: v ? {
       codec: v.codec_name || '',
       width: Number(v.width) || 0,
       height: Number(v.height) || 0,
       fps: parseRate(v.avg_frame_rate) || parseRate(v.r_frame_rate) || 0,
       pixFmt: v.pix_fmt || '',
       bitrate: Number(v.bit_rate) || Number(format.bit_rate) || 0,
-    },
-    audio: streams.filter((s) => s.codec_type === 'audio').map((s) => ({ codec: s.codec_name || '', channels: Number(s.channels) || 0 })),
+    } : null,
+    audio: audio.map((s) => ({ codec: s.codec_name || '', channels: Number(s.channels) || 0 })),
   };
 }
 

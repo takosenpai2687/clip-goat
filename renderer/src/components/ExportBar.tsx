@@ -1,6 +1,6 @@
 import { memo, useState, type MouseEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, CornerDownLeft, Crosshair, FolderInput, Trash2, X, Zap } from 'lucide-react';
+import { AudioLines, Check, CornerDownLeft, Crosshair, FolderInput, Trash2, X, Zap } from 'lucide-react';
 import Menu, { type MenuState } from './Menu';
 import type { ClipResult, ExportMode, ExportPlan, Segment } from '../../../shared/types';
 import { formatLength, formatTime } from '../lib/format';
@@ -26,6 +26,8 @@ interface ExportBarProps {
   segments: Segment[];
   length: number;
   plan: ExportPlan;
+  audioProcessing?: boolean;
+  hasVideo?: boolean;
   canSnap: boolean;
   onSnap: () => void;
   dest: string | null;
@@ -39,7 +41,7 @@ interface ExportBarProps {
   onDeleteSource: () => void;
 }
 
-function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss, onDeleteSource }: ExportBarProps) {
+function ExportBar({ segments, length, plan, audioProcessing = false, hasVideo = false, canSnap, onSnap, dest, onDest, onChooseDest, state, onExport, onCancel, onShow, onDismiss, onDeleteSource }: ExportBarProps) {
   const t = useT();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const figure = formatLength(length);
@@ -108,13 +110,19 @@ function ExportBar({ segments, length, plan, canSnap, onSnap, dest, onDest, onCh
         <button
           type="button"
           className={`chip${plan.mode === 'copy' ? ' is-instant' : ''}`}
-          onClick={plan.mode === 'encode' && canSnap ? onSnap : undefined}
-          disabled={plan.mode === 'copy' || !canSnap}
-          title={plan.mode === 'copy' ? t.instantTip : t.exactTip}
+          onClick={plan.mode === 'encode' && canSnap && (!audioProcessing || hasVideo) ? onSnap : undefined}
+          disabled={plan.mode === 'copy' || !canSnap || (audioProcessing && !hasVideo)}
+          title={audioProcessing && !hasVideo ? t.audioEncodeHint : audioProcessing && plan.mode === 'copy' ? t.videoCopyAudioEncode : plan.mode === 'copy' ? t.instantTip : t.exactTip}
         >
           {plan.mode === 'copy' ? <Zap size={14} strokeWidth={1.5} /> : <Crosshair size={14} strokeWidth={1.5} />}
-          {plan.mode === 'copy' ? t.instant : t.exact}
+          {audioProcessing && !hasVideo ? t.audioEncode : plan.mode === 'copy' ? t.instant : t.exact}
         </button>
+      )}
+      {idle && audioProcessing && hasVideo && (
+        <span className="chip audio-fx-chip" title={t.audioEncodeHint}>
+          <AudioLines size={14} strokeWidth={1.5} aria-hidden="true" />
+          {t.audioEncode}
+        </span>
       )}
 
       <motion.div layout className="export-action" transition={{ type: 'spring', stiffness: 520, damping: 40 }}>

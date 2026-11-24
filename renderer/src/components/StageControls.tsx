@@ -17,6 +17,7 @@ export interface Neighbour {
 }
 
 interface StageControlsProps {
+  compact?: boolean;
   visible: boolean;
   playing: boolean;
   skip: number;
@@ -34,7 +35,7 @@ interface StageControlsProps {
   onOpen: (path: string) => void;
 }
 
-function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate, prev, next, onOpen }: StageControlsProps) {
+function StageControls({ compact = false, visible, playing, skip, onToggle, onSkip, onSkipChange, volume, muted, onVolume, onMute, rate, onRate, prev, next, onOpen }: StageControlsProps) {
   const t = useT();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const silent = muted || volume === 0;
@@ -90,7 +91,7 @@ function StageControls({ visible, playing, skip, onToggle, onSkip, onSkipChange,
         {(visible || menu) && (
           <motion.div
             key="controls"
-            className="stage-controls"
+            className={`stage-controls${compact ? ' is-compact' : ''}`}
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
